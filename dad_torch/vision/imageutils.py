@@ -5,7 +5,7 @@ import os as _os
 import cv2 as _cv2
 import numpy as _np
 from PIL import Image as _IMG
-from easytorch.utils.logger import *
+from dad_torch.utils.logger import *
 
 """
 ##################################################################################################

@@ -4,7 +4,7 @@ from enum import Enum as _Enum
 
 import torch as _torch
 
-MYSELF = 'easytorch'
+MYSELF = 'dad_torch'
 
 CUDA_AVAILABLE = _torch.cuda.is_available()
 NUM_GPUS = _torch.cuda.device_count()

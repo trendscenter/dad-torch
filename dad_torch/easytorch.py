@@ -10,12 +10,12 @@ import torch as _torch
 import torch.distributed as _dist
 import torch.multiprocessing as _mp
 
-import easytorch.config as _conf
-import easytorch.utils as _utils
-from easytorch.config.state import *
-from easytorch.data import ETDataset, ETDataHandle
-from easytorch.trainer import ETTrainer
-from easytorch.utils.logger import *
+import dad_torch.config as _conf
+import dad_torch.utils as _utils
+from dad_torch.config.state import *
+from dad_torch.data import ETDataset, ETDataHandle
+from dad_torch.trainer import ETTrainer
+from dad_torch.utils.logger import *
 
 _sep = _os.sep
 
@@ -72,13 +72,13 @@ class EasyTorch:
                  **kw):
         """
         Order of precedence of arguments is(Higher will override the lower):
-            1. Default args as in easytorch.conf.default_args
+            1. Default args as in dad_torch.conf.default_args
             2. Listed args in __init__ method
             3. kwargs in **kw
         @param dataspecs: List of dict with which dataset details like data_files path, ground truth path...
                 Example: [{'data_dir':'images', 'labels_dir':'manuals', 'splits_dir':'splits'}]
                 Each key with _dir in it will be appended before the value provided in 'dataset_dir' argument.
-        @param args: An argument parser, or, dict. (Defaults are loaded from easytorch.conf.default_args.)
+        @param args: An argument parser, or, dict. (Defaults are loaded from dad_torch.conf.default_args.)
                     Note: values in args will be overridden by the listed args below if provided.
         @param phase: phase of operation; train/test. (Default: None)
                     train phase will run all train, validation, and test step.

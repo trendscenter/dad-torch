@@ -10,7 +10,7 @@ README = (HERE / "README.md").read_text()
 
 # This call to setup() does all the work
 setup(
-    name="easytorch",
+    name="dad_torch",
     version="2.8.5",
     description="Easy Neural Network Experiments with pytorch",
     long_description=README,
@@ -23,7 +23,7 @@ setup(
         "License :: OSI Approved :: MIT License",
         "Programming Language :: Python :: 3.7",
     ],
-    packages=['easytorch', 'easytorch.config', 'easytorch.data', 'easytorch.metrics', 'easytorch.utils', 'easytorch.vision'],
+    packages=['dad_torch', 'dad_torch.config', 'dad_torch.data', 'dad_torch.metrics', 'dad_torch.utils', 'dad_torch.vision'],
     include_package_data=True,
     install_requires=['numpy', 'scipy', 'scikit-learn', 'scikit-image',
                       'pillow', 'matplotlib', 'opencv-python-headless', 'pandas', 'seaborn']

@@ -8,11 +8,11 @@ import os as _os
 import torch as _torch
 import torch.distributed as _dist
 
-import easytorch.utils as _etutils
-from easytorch.config.state import *
-from easytorch.metrics import metrics as _base_metrics
-from easytorch.utils.logger import *
-from easytorch.utils.tensorutils import initialize_weights as _init_weights
+import dad_torch.utils as _etutils
+from dad_torch.config.state import *
+from dad_torch.metrics import metrics as _base_metrics
+from dad_torch.utils.logger import *
+from dad_torch.utils.tensorutils import initialize_weights as _init_weights
 from .vision import plotter as _log_utils
 
 _sep = _os.sep
@@ -79,7 +79,7 @@ class ETTrainer:
                         src=MYSELF):
         r"""
         Load checkpoint from the given path:
-            If it is an easytorch checkpoint, try loading all the models.
+            If it is an dad_torch checkpoint, try loading all the models.
             If it is not, assume it's weights to a single model and laod to first model.
         """
         try:
@@ -144,14 +144,14 @@ class ETTrainer:
 
     def new_metrics(self):
         r"""
-        User can override to supply desired implementation of easytorch.metrics.ETMetrics().
-            Example: easytorch.metrics.Pr11a() will work with precision, recall, F1, Accuracy, IOU scores.
+        User can override to supply desired implementation of dad_torch.metrics.ETMetrics().
+            Example: dad_torch.metrics.Pr11a() will work with precision, recall, F1, Accuracy, IOU scores.
         """
         return _base_metrics.ETMetrics()
 
     def new_averages(self):
         r""""
-        Should supply an implementation of easytorch.metrics.ETAverages() that can keep track of multiple averages.
+        Should supply an implementation of dad_torch.metrics.ETAverages() that can keep track of multiple averages.
             Example: multiple loss, or any other values.
         """
         return _base_metrics.ETAverages(num_averages=1)

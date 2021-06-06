@@ -2,7 +2,7 @@
 
 ```python
 import argparse
-from easytorch import default_ap, EasyTorch
+from dad_torch import default_ap, EasyTorch
 
 ap = argparse.ArgumentParser(parents=[default_ap], add_help=False)
 ap.add_argument('-a_new', '--new_argument', default=1, type=int, help='My new argument')

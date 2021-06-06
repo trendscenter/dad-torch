@@ -32,14 +32,14 @@ def save_predictions(self, dataset, its):
 
  def new_metrics(self):
         r"""
-        User can override to supply desired implementation of easytorch.core.metrics.ETMetrics().
-            Example: easytorch.metrics.Prf1a() will work with precision, recall, F1, Accuracy, IOU scores.
+        User can override to supply desired implementation of dad_torch.core.metrics.ETMetrics().
+            Example: dad_torch.metrics.Prf1a() will work with precision, recall, F1, Accuracy, IOU scores.
         """
         return easytorch.Prf1a()
 
 def new_averages(self):
     r""""
-    Should supply an implementation of easytorch.metrics.ETAverages() that can keep track of multiple averages.
+    Should supply an implementation of dad_torch.metrics.ETAverages() that can keep track of multiple averages.
         Example: multiple loss, or any other values.
     """
     return easytorch.ETAverages(num_averages=1)
@@ -58,10 +58,10 @@ def init_experiment_cache(self):
         self.cache['monitor_metric'] = 'time'
         self.cache['metric_direction'] = 'maximize'
     2. Set new log_headers based on what is returned by get() method
-        of your implementation of easytorch.metrics.ETMetrics and easytorch.metrics.ETAverages class:
+        of your implementation of dad_torch.metrics.ETMetrics and dad_torch.metrics.ETAverages class:
         For example:
-        - The get method of easytorch.metrics.ETAverages class returns the average loss value.
-        - The get method of easytorch.metrics.Prf1a returns Accuracy,F1,Precision,Recall
+        - The get method of dad_torch.metrics.ETAverages class returns the average loss value.
+        - The get method of dad_torch.metrics.Prf1a returns Accuracy,F1,Precision,Recall
         - so Default heade is [Loss,Precision,Recall,F1,Accuracy]
     3. Set new log_dir based on different experiment versions on each datasets as per info. received from arguments.
     """
