@@ -14,7 +14,7 @@ import dad_torch.config as _conf
 import dad_torch.utils as _utils
 from dad_torch.config.state import *
 from dad_torch.data import ETDataset, ETDataHandle
-from dad_torch.trainer import ETTrainer
+from dad_torch.trainer import DADTrainer
 from dad_torch.utils.logger import *
 
 _sep = _os.sep
@@ -35,11 +35,11 @@ def _ddp_worker(gpu, self, trainer_cls, dataset_cls, data_handle_cls):
     self._run(trainer_cls, dataset_cls, data_handle_cls)
 
 
-class EasyTorch:
+class DADTorch:
     _MODES_ = [Phase.TRAIN, Phase.TEST]
     _MODE_ERR_ = \
         "####  [ERROR]  ### argument 'phase' is required and must be passed to either" \
-        '\n\t1). EasyTorch(..,phase=<value>,..)' \
+        '\n\t1). DADTorch(..,phase=<value>,..)' \
         '\n\t2). runtime arguments 2). python main.py -ph <value> ...' \
         f'\nPossible values are:{_MODES_}'
 
@@ -166,7 +166,7 @@ class EasyTorch:
         elif isinstance(args, dict):
             self.args = {**args}
         else:
-            raise ValueError('2nd Argument of EasyTorch could be only one of :ArgumentParser, dict')
+            raise ValueError('2nd Argument of DADTorch could be only one of :ArgumentParser, dict')
 
     def _make_reproducible(self):
         if self.args['use_ddp'] and self.args['seed'] is None:
@@ -274,7 +274,7 @@ class EasyTorch:
                                file_keys=[LogKey.TEST_METRICS])
             return test_out
 
-    def run(self, trainer_cls: typing.Type[ETTrainer],
+    def run(self, trainer_cls: typing.Type[DADTrainer],
             dataset_cls: typing.Type[ETDataset] = None,
             data_handle_cls: typing.Type[ETDataHandle] = ETDataHandle):
         if self.args.get('use_ddp'):

@@ -1,4 +1,4 @@
-from easytorch import EasyTorch, ETTrainer, ConfusionMatrix
+from dad_torch import DADTorch, DADTrainer, ConfusionMatrix
 from torchvision import datasets, transforms
 from torch import nn
 import torch.nn.functional as F
@@ -37,7 +37,7 @@ class MNISTNet(nn.Module):
         return output
 
 
-class MNISTTrainer(ETTrainer):
+class MNISTTrainer(DADTrainer):
     def _init_nn_model(self):
         self.nn['model'] = MNISTNet()
 
@@ -72,7 +72,7 @@ val_dataset = datasets.MNIST('../data', train=False,
 
 dataloader_args = {'train': {'dataset': train_dataset},
                    'test': {'dataset': val_dataset}}
-runner = EasyTorch(phase='train',
-                   batch_size=128, epochs=5, gpus=[0],
-                   dataloader_args=dataloader_args)
+runner = DADTorch(phase='train',
+                  batch_size=128, epochs=5, gpus=[0],
+                  dataloader_args=dataloader_args)
 runner.run(MNISTTrainer)

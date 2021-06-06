@@ -1,5 +1,5 @@
 r"""
-The main core of EasyTorch
+The main core of DADTorch
 """
 
 import math as _math
@@ -18,7 +18,7 @@ from .vision import plotter as _log_utils
 _sep = _os.sep
 
 
-class ETTrainer:
+class DADTrainer:
     def __init__(self, args=None, data_handle=None, **kw):
         r"""
         args: receives the arguments passed by the ArgsParser.
@@ -144,17 +144,17 @@ class ETTrainer:
 
     def new_metrics(self):
         r"""
-        User can override to supply desired implementation of dad_torch.metrics.ETMetrics().
+        User can override to supply desired implementation of dad_torch.metrics.DADMetrics().
             Example: dad_torch.metrics.Pr11a() will work with precision, recall, F1, Accuracy, IOU scores.
         """
-        return _base_metrics.ETMetrics()
+        return _base_metrics.DADMetrics()
 
     def new_averages(self):
         r""""
         Should supply an implementation of dad_torch.metrics.ETAverages() that can keep track of multiple averages.
             Example: multiple loss, or any other values.
         """
-        return _base_metrics.ETAverages(num_averages=1)
+        return _base_metrics.DADAverages(num_averages=1)
 
     def save_checkpoint(self,
                         full_path,
@@ -295,11 +295,11 @@ class ETTrainer:
         reduced = {}.fromkeys(its[0].keys(), None)
 
         for key in reduced:
-            if isinstance(its[0][key], _base_metrics.ETAverages):
+            if isinstance(its[0][key], _base_metrics.DADAverages):
                 reduced[key] = self.new_averages()
                 [reduced[key].accumulate(ik[key]) for ik in its]
 
-            elif isinstance(its[0][key], _base_metrics.ETMetrics):
+            elif isinstance(its[0][key], _base_metrics.DADMetrics):
                 reduced[key] = self.new_metrics()
                 [reduced[key].accumulate(ik[key]) for ik in its]
             else:

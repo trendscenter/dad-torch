@@ -1,6 +1,6 @@
 r"""
 ETTrainer calls .averages(), .metrics() internally to get whatever you have
-added in the ETAverages, ETMetrics respectively.
+added in the ETAverages, DADMetrics respectively.
 """
 
 import abc as _abc
@@ -34,7 +34,7 @@ class SerializableMetrics:
         pass
 
 
-class ETMetrics(SerializableMetrics):
+class DADMetrics(SerializableMetrics):
     def __init__(self, **kw):
         super().__init__(**kw)
 
@@ -61,7 +61,7 @@ class ETMetrics(SerializableMetrics):
 
     def accumulate(self, other):
         r"""
-        Add all the content from another ETMetrics object.
+        Add all the content from another DADMetrics object.
         """
         pass
 
@@ -104,7 +104,7 @@ class ETMetrics(SerializableMetrics):
         return sc
 
 
-class ETAverages(ETMetrics):
+class DADAverages(DADMetrics):
     def __init__(self, num_averages=1, **kw):
         r"""
         This class can keep track of K averages.
@@ -163,7 +163,7 @@ class ETAverages(ETMetrics):
         return [self.values, self.counts]
 
 
-class Prf1a(ETMetrics):
+class Prf1a(DADMetrics):
     r"""
     A class that has GPU based computation of:
         Precision, Recall, F1 Score, Accuracy, and Overlap(IOU).
@@ -193,7 +193,7 @@ class Prf1a(ETMetrics):
         self.tn += _torch.sum(y_cases == 0).item()
         self.fn += _torch.sum(y_cases == 2).item()
 
-    def accumulate(self, other: ETMetrics):
+    def accumulate(self, other: DADMetrics):
         self.tp += other.tp
         self.fp += other.fp
         self.tn += other.tn
@@ -239,7 +239,7 @@ class Prf1a(ETMetrics):
         return [self.tn, self.fp, self.fn, self.tp]
 
 
-class ConfusionMatrix(ETMetrics):
+class ConfusionMatrix(DADMetrics):
     """
     Confusion matrix  is used in multi class classification case.
     x-axis is predicted. y-axis is true label.
@@ -258,7 +258,7 @@ class ConfusionMatrix(ETMetrics):
     def update(self, matrix=0, **kw):
         self.matrix += _torch.tensor(matrix)
 
-    def accumulate(self, other: ETMetrics):
+    def accumulate(self, other: DADMetrics):
         self.matrix += other.matrix
 
     def add(self, pred: _torch.Tensor, true: _torch.Tensor):

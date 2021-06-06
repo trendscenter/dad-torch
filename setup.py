@@ -15,7 +15,7 @@ setup(
     description="Easy Neural Network Experiments with pytorch",
     long_description=README,
     long_description_content_type="text/markdown",
-    url="https://github.com/sraashis/easytorch",
+    url="https://github.com/trendscenter/dad-torch",
     author="Aashis Khana1",
     author_email="sraashis@gmail.com",
     license="MIT",
