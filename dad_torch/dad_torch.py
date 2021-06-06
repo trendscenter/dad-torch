@@ -20,7 +20,7 @@ from dad_torch.utils.logger import *
 _sep = _os.sep
 
 
-def _ddp_worker(gpu, self, trainer_cls, dataset_cls, data_handle_cls, is_pooled):
+def _ddp_worker(gpu, self, trainer_cls, dataset_cls, data_handle_cls):
     import torch.distributed as _dist
     self.args['gpu'] = gpu
     self.args['verbose'] = gpu == MASTER_RANK
@@ -32,10 +32,7 @@ def _ddp_worker(gpu, self, trainer_cls, dataset_cls, data_handle_cls, is_pooled)
     _dist.init_process_group(backend=self.args['dist_backend'],
                              init_method=self.args['dist_url'],
                              world_size=world_size, rank=world_rank)
-    if is_pooled:
-        self._run_pooled(trainer_cls, dataset_cls, data_handle_cls)
-    else:
-        self._run(trainer_cls, dataset_cls, data_handle_cls)
+    self._run(trainer_cls, dataset_cls, data_handle_cls)
 
 
 class EasyTorch:
@@ -282,7 +279,7 @@ class EasyTorch:
             data_handle_cls: typing.Type[ETDataHandle] = ETDataHandle):
         if self.args.get('use_ddp'):
             _mp.spawn(_ddp_worker, nprocs=self.args['num_gpus'],
-                      args=(self, trainer_cls, dataset_cls, data_handle_cls, False))
+                      args=(self, trainer_cls, dataset_cls, data_handle_cls))
         else:
             self._run(trainer_cls, dataset_cls, data_handle_cls)
 
@@ -337,57 +334,3 @@ class EasyTorch:
 
             if trainer.args.get('use_ddp'):
                 _dist.barrier()
-
-    def run_pooled(self, trainer_cls: typing.Type[ETTrainer],
-                   dataset_cls: typing.Type[ETDataset] = None,
-                   data_handle_cls: typing.Type[ETDataHandle] = ETDataHandle):
-
-        if self.args.get('use_ddp'):
-            _mp.spawn(_ddp_worker, nprocs=self.args['num_gpus'],
-                      args=(self, trainer_cls, dataset_cls, data_handle_cls, True))
-        else:
-            self._run_pooled(trainer_cls, dataset_cls, data_handle_cls)
-
-    def _run_pooled(self, trainer_cls, dataset_cls, data_handle_cls):
-        r"""  Run in pooled fashion. """
-        if self.args['verbose']:
-            self._show_args()
-
-        data_handle = data_handle_cls(args=self.args, dataloader_args=self.dataloader_args)
-        trainer = trainer_cls(args=self.args, data_handle=data_handle)
-        trainer.init_nn(init_models=False, init_weights=False, init_optimizer=False)
-
-        trainer.cache['log_dir'] = self.args['log_dir'] + _sep + f'Pooled_{len(self.dataspecs)}'
-        for dspec in self.dataspecs:
-            trainer.data_handle.init_dataspec_(dspec)
-            trainer.data_handle.create_splits(dspec, out_dir=trainer.cache['log_dir'] + _sep + dspec['name'])
-
-        warn('Pooling only uses first split from each datasets at the moment.', self.args['verbose'])
-
-        trainer.cache[LogKey.GLOBAL_TEST_METRICS] = []
-        trainer.cache['log_header'] = 'Loss|Accuracy'
-        trainer.cache.update(monitor_metric='time', metric_direction='maximize')
-
-        """Initialize experiment essentials"""
-        trainer.init_experiment_cache()
-        _os.makedirs(trainer.cache['log_dir'], exist_ok=True)
-
-        self._init_fold_cache('pooled.dummy', trainer.cache)
-
-        if self.args['is_master']:
-            self.check_previous_logs(trainer.cache)
-
-        trainer.init_nn()
-        if self.args['phase'] == Phase.TRAIN:
-            train_dataset = ETDataHandle.pooled_load('train', self.dataspecs, self.args,
-                                                     dataset_cls=dataset_cls, load_sparse=False)[0]
-            val_dataset = ETDataHandle.pooled_load('validation', self.dataspecs, self.args,
-                                                   dataset_cls=dataset_cls, load_sparse=False)
-            self._train(trainer, train_dataset, val_dataset, {'dataspecs': self.dataspecs})
-
-        """Only do test in master rank node"""
-        if self.args['is_master']:
-            test_dataset = ETDataHandle.pooled_load('test', self.dataspecs, self.args,
-                                                    dataset_cls=dataset_cls, load_sparse=False)
-            scores = trainer.reduce_scores([self._test('Pooled', trainer, test_dataset)], distributed=False)
-            self._global_experiment_end(trainer, scores)
