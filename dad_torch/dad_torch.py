@@ -14,14 +14,13 @@ import dad_torch.config as _conf
 import dad_torch.utils as _utils
 from dad_torch.config.state import *
 from dad_torch.data import ETDataset, ETDataHandle
-from dad_torch.trainer import DADTrainer
+from dad_torch.trainer import NNTrainer
 from dad_torch.utils.logger import *
 
 _sep = _os.sep
 
 
-def _ddp_worker(gpu, self, trainer_cls, dataset_cls, data_handle_cls):
-    import torch.distributed as _dist
+def _dad_worker(gpu, self, trainer_cls, dataset_cls, data_handle_cls):
     self.args['gpu'] = gpu
     self.args['verbose'] = gpu == MASTER_RANK
     self.args['is_master'] = gpu == MASTER_RANK
@@ -135,7 +134,7 @@ class DADTorch:
         self._init_dataspecs(dataspecs)
 
         self._device_check()
-        self._ddp_setup()
+        self._dad_setup()
         self._make_reproducible()
         self.args.update(is_master=self.args.get('is_master', True))
 
@@ -147,13 +146,13 @@ class DADTorch:
                  f"Using {str(NUM_GPUS) + ' GPU(s)' if CUDA_AVAILABLE else 'CPU(Much slower)'}.")
             self.args['gpus'] = list(range(NUM_GPUS))
 
-    def _ddp_setup(self):
-        if all([self.args['use_ddp'], NUM_GPUS >= 1, len(self.args['gpus']) >= 1]):
+    def _dad_setup(self):
+        if all([self.args['use_dad'], NUM_GPUS >= 1, len(self.args['gpus']) >= 1]):
             self.args['num_gpus'] = len(self.args['gpus'])
             _os.environ['MASTER_ADDR'] = self.args.get('master_addr', '127.0.0.1')  #
             _os.environ['MASTER_PORT'] = self.args.get('master_port', '12355')
         else:
-            self.args['use_ddp'] = False
+            self.args['use_dad'] = False
 
     def _show_args(self):
         info('Starting with the following parameters:', self.args['verbose'])
@@ -169,8 +168,8 @@ class DADTorch:
             raise ValueError('2nd Argument of DADTorch could be only one of :ArgumentParser, dict')
 
     def _make_reproducible(self):
-        if self.args['use_ddp'] and self.args['seed'] is None:
-            raise ValueError('Seed must be explicitly given as seed=<seed> (Eg.1, 2, 101, 102) in DDP.')
+        if self.args['use_dad'] and self.args['seed'] is None:
+            raise ValueError('Seed must be explicitly given as seed=<seed> (Eg.1, 2, 101, 102) in DAD.')
 
         if self.args['seed'] is None:
             self.args['seed'] = CURRENT_SEED
@@ -274,11 +273,11 @@ class DADTorch:
                                file_keys=[LogKey.TEST_METRICS])
             return test_out
 
-    def run(self, trainer_cls: typing.Type[DADTrainer],
+    def run(self, trainer_cls: typing.Type[NNTrainer],
             dataset_cls: typing.Type[ETDataset] = None,
             data_handle_cls: typing.Type[ETDataHandle] = ETDataHandle):
-        if self.args.get('use_ddp'):
-            _mp.spawn(_ddp_worker, nprocs=self.args['num_gpus'],
+        if self.args.get('use_dad'):
+            _mp.spawn(_dad_worker, nprocs=self.args['num_gpus'],
                       args=(self, trainer_cls, dataset_cls, data_handle_cls))
         else:
             self._run(trainer_cls, dataset_cls, data_handle_cls)
@@ -325,12 +324,12 @@ class DADTorch:
                     )
                     test_accum.append(self._test(split_file, trainer, test_dataset))
 
-                if trainer.args.get('use_ddp'):
+                if trainer.args.get('use_dad'):
                     _dist.barrier()
 
             if self.args['is_master']:
                 global_scores = trainer.reduce_scores(test_accum, distributed=False)
                 self._global_experiment_end(trainer, global_scores)
 
-            if trainer.args.get('use_ddp'):
+            if trainer.args.get('use_dad'):
                 _dist.barrier()

@@ -14,11 +14,12 @@ from dad_torch.metrics import metrics as _base_metrics
 from dad_torch.utils.logger import *
 from dad_torch.utils.tensorutils import initialize_weights as _init_weights
 from .vision import plotter as _log_utils
+from .distrib import DADParallel
 
 _sep = _os.sep
 
 
-class DADTrainer:
+class NNTrainer:
     def __init__(self, args=None, data_handle=None, **kw):
         r"""
         args: receives the arguments passed by the ArgsParser.
@@ -120,12 +121,13 @@ class DADTrainer:
         Expects list of GPUS as [0, 1, 2, 3]., list of GPUS will make it use DataParallel.
         If no GPU is present, CPU is used.
         """
-        if self.args.get('use_ddp'):
+
+        if self.args.get('use_dad'):
             for model_key in self.nn:
                 self.nn[model_key] = self.nn[model_key].to(self.device['gpu'])
             for model_key in self.nn:
-                self.nn[model_key] = _torch.nn.parallel.DistributedDataParallel(self.nn[model_key],
-                                                                                device_ids=[self.device['gpu']])
+                self.nn[model_key] = DADParallel(module_key=model_key, trainer=self, rank=_dist.get_rank())
+
         elif len(self.args['gpus']) >= 1:
             self.device['gpu'] = _torch.device(f"cuda:{self.args['gpus'][0]}")
             if len(self.args['gpus']) >= 2:
@@ -366,6 +368,11 @@ class DADTrainer:
         """
         it = self.iteration(batch)
         it['loss'].backward()
+
+        if self.args.get('use_dad'):
+            for mk in self.nn:
+                self.nn[mk].backward()
+                
         if i % self.args.get('grad_accum_iters', 1) == 0:
             for optim in self.optimizer:
                 self.optimizer[optim].step()
@@ -414,7 +421,7 @@ class DADTrainer:
     def validation(self, epoch, dataset) -> dict:
         return self.evaluation(epoch=epoch, mode='validation',
                                dataset=dataset,
-                               distributed=self.args['use_ddp'],
+                               distributed=self.args['use_dad'],
                                use_unpadded_sampler=True)
 
     def _global_debug(self, running_averages, running_metrics, **kw):
@@ -432,8 +439,8 @@ class DADTrainer:
                 self.args['verbose'])
             r"""Debug and reset running accumulators"""
 
-            if not self.args['use_ddp']:
-                """Plot only in non-ddp mode to maintain consistency"""
+            if not self.args['use_dad']:
+                """Plot only in non-dad mode to maintain consistency"""
                 self.cache[LogKey.TRAIN_LOG].append([*running_averages.get(), *running_metrics.get()])
 
             running_averages.reset(), running_metrics.reset()
@@ -445,7 +452,7 @@ class DADTrainer:
             handle_key='train',
             shuffle=True,
             dataset=train_dataset,
-            distributed=self.args['use_ddp']
+            distributed=self.args['use_dad']
         )
 
         for ep in range(1, self.args['epochs'] + 1):
@@ -461,7 +468,7 @@ class DADTrainer:
             """Keep track of running metrics and averages for logging/plotting"""
             _metrics, _avg = self.new_metrics(), self.new_averages()
 
-            if self.args.get('use_ddp'):
+            if self.args.get('use_dad'):
                 train_loader.sampler.set_epoch(ep)
 
             num_iters = len(train_loader) // self.args['grad_accum_iters']
@@ -484,14 +491,14 @@ class DADTrainer:
 
             reduced_epoch = self.reduce_scores(
                 [{'averages': epoch_avg, 'metrics': epoch_metrics}],
-                distributed=self.args['use_ddp']
+                distributed=self.args['use_dad']
             )
             epoch_out = {'epoch': ep, 'training': reduced_epoch}
 
             """Validation step"""
             if validation_dataset is not None:
                 val_out = self.validation(ep, validation_dataset)
-                epoch_out['validation'] = self.reduce_scores([val_out], distributed=self.args['use_ddp'])
+                epoch_out['validation'] = self.reduce_scores([val_out], distributed=self.args['use_dad'])
 
             self._on_epoch_end(**epoch_out)
             if self.args['is_master']:

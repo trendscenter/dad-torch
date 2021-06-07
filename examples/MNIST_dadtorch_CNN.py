@@ -1,4 +1,4 @@
-from dad_torch import DADTorch, DADTrainer, ConfusionMatrix
+from dad_torch import DADTorch, NNTrainer, ConfusionMatrix
 from torchvision import datasets, transforms
 from torch import nn
 import torch.nn.functional as F
@@ -37,7 +37,7 @@ class MNISTNet(nn.Module):
         return output
 
 
-class MNISTTrainer(DADTrainer):
+class MNISTTrainer(NNTrainer):
     def _init_nn_model(self):
         self.nn['model'] = MNISTNet()
 
