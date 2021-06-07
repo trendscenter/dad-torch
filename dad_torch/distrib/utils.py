@@ -38,9 +38,9 @@ class DADParallel(_torch.nn.Module):
         if not rank:
             self.rank = _dist.get_rank()
 
-        self.data_path = self.trainer.cache[
-                             'log_dir'] + _os.sep + f"{self.rank}" + _os.sep + self.DATA_PATH + _os.sep + module_key
-       
+        _rank_path = f"{self.rank}" + _os.sep + self.DATA_PATH + _os.sep + module_key
+        self.data_path = self.trainer.cache['log_dir'] + _os.sep + _rank_path
+
         self.fw_hooks = []
         self.bk_hooks = []
 
@@ -83,7 +83,7 @@ class DADParallel(_torch.nn.Module):
         _dist.all_gather(t_list, t)
         return _torch.cat(t_list)
 
-    def backward(self):
+    def dad_backward(self):
         fk = list(self.trainer.nn.keys())[0]
         dad_layers = [k for k, _ in self.trainer.nn[fk].named_children()][::-1]
         dad_params = dict([(k, v) for k, v in self.trainer.nn[fk].named_parameters()])
@@ -95,5 +95,3 @@ class DADParallel(_torch.nn.Module):
             local_grad_tall = self._all_gather_concat(local_grad_file)
 
             dad_params[layer].grad.data = act_tall.T.mm(local_grad_tall)
-
-
