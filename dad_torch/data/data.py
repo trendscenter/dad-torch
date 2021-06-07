@@ -13,7 +13,7 @@ from torch.utils.data._utils.collate import default_collate as _default_collate
 
 import dad_torch.data.datautils as _du
 import dad_torch.utils as _etutils
-from dad_torch.distrib.utils import UnPaddedDDPSampler
+from dad_torch import UnPaddedDDPSampler
 from dad_torch.utils.logger import *
 
 
