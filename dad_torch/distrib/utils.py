@@ -3,6 +3,7 @@ import torch
 import torch as _torch
 from torch import distributed as _dist
 import os as _os
+import shutil as _shu
 
 
 def hook_wrapper(rank, hook_type, layer, save_to='', debug=False):
@@ -73,6 +74,11 @@ class DADParallel(_torch.nn.Module):
         return self
 
     def forward(self, *inputs, **kwargs):
+        if self.training:
+            """Cleanup for each iterations"""
+            if _os.path.exists(self.data_path):
+                _shu.rmtree(self.data_path)
+            _os.makedirs(self.data_path, exist_ok=True)
         output = self.module(*inputs, **kwargs)
         return output
 
