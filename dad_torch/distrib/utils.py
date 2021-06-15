@@ -77,14 +77,15 @@ class DADParallel(_torch.nn.Module):
         return _torch.cat(t_list)
 
     def dad_backward(self):
-        dad_layers = [k for k, _ in self.module.named_children()][::-1]
         dad_params = dict([(k, v) for k, v in self.module.named_parameters()])
         local_grads_tall = torch.Tensor([0])
-        for layer in dad_layers:
+        for layer, _ in dad_params.keys():
             if 'weight' in layer:
-                act_tall = self._all_gather_concat(self._activations[layer])
-                local_grad_tall = self._all_gather_concat(self._local_grads[layer])
-                dad_params[f"{layer}.weight"].grad.data = act_tall.T.mm(local_grad_tall)
+                child_name = layer.split['.'][-2]
+                act_tall = self._all_gather_concat(self._activations[child_name])
+                local_grad_tall = self._all_gather_concat(self._local_grads[child_name])
+                dad_params[layer].grad.data = act_tall.T.mm(local_grad_tall)
+
             elif 'bias' in layer:
-                dad_params[f"{layer}.bias"].grad.data = local_grads_tall.sum(0, keepdim=True)
+                dad_params[layer].grad.data = local_grads_tall.sum(0, keepdim=True)
                 local_grads_tall = torch.Tensor([0])
