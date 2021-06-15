@@ -74,7 +74,5 @@ val_dataset = datasets.MNIST('../data', train=False,
 
 dataloader_args = {'train': {'dataset': train_dataset},
                    'test': {'dataset': val_dataset}}
-runner = DADTorch(phase='train',
-                  batch_size=128, epochs=5, gpus=[0],
-                  dataloader_args=dataloader_args)
+runner = DADTorch(dataloader_args=dataloader_args)
 runner.run(MNISTTrainer)
