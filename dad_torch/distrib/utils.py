@@ -1,3 +1,4 @@
+import torch
 import torch as _torch
 from torch import distributed as _dist
 
@@ -8,6 +9,7 @@ class DADParallel(_torch.nn.Module):
         super(DADParallel, self).__init__()
         self.module = trainer.nn[module_key]
         self.trainer = trainer
+        self.device = trainer.device['gpu']
         self.rank = rank
         self._reset()
 
@@ -37,14 +39,13 @@ class DADParallel(_torch.nn.Module):
 
     def _hook(self):
         if self.training:
-            for model_key in self.trainer.nn.keys():
-                for layer, ch in list(self.trainer.nn[model_key].named_children()):
-                    self.fw_hooks_handle.append(
-                        ch.register_forward_hook(self._hook_fn(self.rank, 'forward', layer))
-                    )
-                    self.bk_hooks_handle.append(
-                        ch.register_backward_hook(self._hook_fn(self.rank, 'backward', layer))
-                    )
+            for layer, ch in list(self.module.named_children()):
+                self.fw_hooks_handle.append(
+                    ch.register_forward_hook(self._hook_fn(self.rank, 'forward', layer))
+                )
+                self.bk_hooks_handle.append(
+                    ch.register_backward_hook(self._hook_fn(self.rank, 'backward', layer))
+                )
 
     def _unhook(self):
         for hk in self.fw_hooks_handle:
@@ -76,10 +77,14 @@ class DADParallel(_torch.nn.Module):
         return _torch.cat(t_list)
 
     def dad_backward(self):
-        fk = list(self.trainer.nn.keys())[0]
-        dad_layers = [k for k, _ in self.trainer.nn[fk].named_children()][::-1]
-        dad_params = dict([(k, v) for k, v in self.trainer.nn[fk].named_parameters()])
-        for layer in zip(dad_layers):
-            act_tall = self._all_gather_concat(self._activations[layer])
-            local_grad_tall = self._all_gather_concat(self._local_grads[layer])
-            dad_params[layer].grad.data = act_tall.T.mm(local_grad_tall)
+        dad_layers = [k for k, _ in self.module.named_children()][::-1]
+        dad_params = dict([(k, v) for k, v in self.module.named_parameters()])
+        local_grads_tall = torch.Tensor([0])
+        for layer in dad_layers:
+            if 'weight' in layer:
+                act_tall = self._all_gather_concat(self._activations[layer])
+                local_grad_tall = self._all_gather_concat(self._local_grads[layer])
+                dad_params[f"{layer}.weight"].grad.data = act_tall.T.mm(local_grad_tall)
+            elif 'bias' in layer:
+                dad_params[f"{layer}.bias"].grad.data = local_grads_tall.sum(0, keepdim=True)
+                local_grads_tall = torch.Tensor([0])
