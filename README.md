@@ -11,3 +11,5 @@ import dad_torch.distrib.utils as utils
 
 model = utils.DADParallel(...) # See trainer.py for the exact usage.
 ```
+#### Run example/MNIST_dadtorch.py as:
+`examples]$ python MNIST_dadtorch_CNN.py -ph train -dad True -seed 1`
