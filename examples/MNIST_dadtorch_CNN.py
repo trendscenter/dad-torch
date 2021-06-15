@@ -1,8 +1,10 @@
-from dad_torch import DADTorch, NNTrainer, ConfusionMatrix
-from torchvision import datasets, transforms
-from torch import nn
-import torch.nn.functional as F
 import torch
+import torch.nn.functional as F
+from torch import nn
+from torchvision import datasets, transforms
+
+from dad_torch import DADTorch, NNTrainer, ConfusionMatrix
+from dad_torch.distrib import DADParallel
 
 transform = transforms.Compose([
     transforms.ToTensor(),
@@ -39,7 +41,7 @@ class MNISTNet(nn.Module):
 
 class MNISTTrainer(NNTrainer):
     def _init_nn_model(self):
-        self.nn['model'] = MNISTNet()
+        self.nn['model'] = DADParallel(MNISTNet())
 
     def iteration(self, batch):
         inputs = batch[0].to(self.device['gpu']).float()

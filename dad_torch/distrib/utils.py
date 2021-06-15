@@ -5,11 +5,11 @@ from torch import distributed as _dist
 
 class DADParallel(_torch.nn.Module):
 
-    def __init__(self, module_key, trainer, rank=_dist.get_rank()):
+    def __init__(self, module, device=None, rank=_dist.get_rank()):
+
         super(DADParallel, self).__init__()
-        self.module = trainer.nn[module_key]
-        self.trainer = trainer
-        self.device = trainer.device['gpu']
+        self.module = module
+        self.device = device
         self.rank = rank
         self._reset()
 
