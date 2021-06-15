@@ -13,8 +13,8 @@ from dad_torch.config.state import *
 from dad_torch.metrics import metrics as _base_metrics
 from dad_torch.utils.logger import *
 from dad_torch.utils.tensorutils import initialize_weights as _init_weights
-from .vision import plotter as _log_utils
 from .distrib import DADParallel
+from .vision import plotter as _log_utils
 
 _sep = _os.sep
 
@@ -126,7 +126,8 @@ class NNTrainer:
             for model_key in self.nn:
                 self.nn[model_key] = self.nn[model_key].to(self.device['gpu'])
             for model_key in self.nn:
-                self.nn[model_key] = DADParallel(module_key=model_key, trainer=self, rank=_dist.get_rank())
+                self.nn[model_key] = DADParallel(module=self.nn[model_key], device=self.device['gpu'],
+                                                 rank=_dist.get_rank())
 
         elif len(self.args['gpus']) >= 1:
             self.device['gpu'] = _torch.device(f"cuda:{self.args['gpus'][0]}")
@@ -372,7 +373,7 @@ class NNTrainer:
         if self.args.get('use_dad'):
             for mk in self.nn:
                 self.nn[mk].dad_backward()
-                
+
         if i % self.args.get('grad_accum_iters', 1) == 0:
             for optim in self.optimizer:
                 self.optimizer[optim].step()

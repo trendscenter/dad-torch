@@ -4,7 +4,6 @@ from torch import nn
 from torchvision import datasets, transforms
 
 from dad_torch import DADTorch, NNTrainer, ConfusionMatrix
-from dad_torch.distrib import DADParallel
 
 transform = transforms.Compose([
     transforms.ToTensor(),
@@ -16,35 +15,23 @@ transform = transforms.Compose([
 class MNISTNet(nn.Module):
     def __init__(self):
         super(MNISTNet, self).__init__()
-        self.conv1 = nn.Conv2d(1, 32, 3, 1)
-        self.conv2 = nn.Conv2d(32, 64, 3, 1)
-        self.dropout1 = nn.Dropout(0.25)
-        self.dropout2 = nn.Dropout(0.5)
-        self.fc1 = nn.Linear(9216, 128)
-        self.fc2 = nn.Linear(128, 10)
+        self.l1 = nn.Linear(784, 512, bias=True)
+        self.l2 = nn.Linear(512, 256, bias=True)
+        self.l3 = nn.Linear(256, 10, bias=True)
 
     def forward(self, x):
-        x = self.conv1(x)
-        x = F.relu(x)
-        x = self.conv2(x)
-        x = F.relu(x)
-        x = F.max_pool2d(x, 2)
-        x = self.dropout1(x)
-        x = torch.flatten(x, 1)
-        x = self.fc1(x)
-        x = F.relu(x)
-        x = self.dropout2(x)
-        x = self.fc2(x)
-        output = F.log_softmax(x, dim=1)
+        x = F.relu(self.l1(x))
+        x = F.relu(self.l2(x))
+        output = F.log_softmax(self.l3(x), dim=1)
         return output
 
 
 class MNISTTrainer(NNTrainer):
     def _init_nn_model(self):
-        self.nn['model'] = DADParallel(MNISTNet())
+        self.nn['model'] = MNISTNet()
 
     def iteration(self, batch):
-        inputs = batch[0].to(self.device['gpu']).float()
+        inputs = torch.flatten(batch[0].to(self.device['gpu']).float(), 1)
         labels = batch[1].to(self.device['gpu']).long()
 
         out = self.nn['model'](inputs)
@@ -67,12 +54,13 @@ class MNISTTrainer(NNTrainer):
         return ConfusionMatrix(num_classes=10)
 
 
-train_dataset = datasets.MNIST('../data', train=True, download=True,
-                               transform=transform)
-val_dataset = datasets.MNIST('../data', train=False,
-                             transform=transform)
+if __name__ == "__main__":
+    train_dataset = datasets.MNIST('data', train=True, download=True,
+                                   transform=transform)
+    val_dataset = datasets.MNIST('data', train=False,
+                                 transform=transform)
 
-dataloader_args = {'train': {'dataset': train_dataset},
-                   'test': {'dataset': val_dataset}}
-runner = DADTorch(dataloader_args=dataloader_args)
-runner.run(MNISTTrainer)
+    dataloader_args = {'train': {'dataset': train_dataset},
+                       'test': {'dataset': val_dataset}}
+    runner = DADTorch(dataloader_args=dataloader_args, batch_size=32)
+    runner.run(MNISTTrainer)
