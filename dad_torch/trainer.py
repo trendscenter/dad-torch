@@ -394,7 +394,6 @@ class NNTrainer:
         if distributed:
             avg_serial = _torch.tensor(averages.serialize()).to(self.device['gpu'])
             _dist.reduce(avg_serial, dst=MASTER_RANK, op=_dist.ReduceOp.SUM)
-            # print('*************** ', metrics.serialize())
             metrics_serial = _torch.tensor(metrics.serialize()).to(self.device['gpu'])
             _dist.reduce(metrics_serial, dst=MASTER_RANK, op=_dist.ReduceOp.SUM)
 
@@ -494,6 +493,7 @@ class NNTrainer:
                 [{'averages': epoch_avg, 'metrics': epoch_metrics}],
                 distributed=self.args['use_dad']
             )
+
             epoch_out = {'epoch': ep, 'training': reduced_epoch}
 
             """Validation step"""
@@ -512,7 +512,7 @@ class NNTrainer:
         self._save_progress(epoch=ep)
 
     def _global_epoch_end(self, **kw):
-        if kw.get('train') is not None:
+        if kw.get('training') is not None:
             self.cache[LogKey.TRAIN_LOG].append(
                 [*kw['train']['averages'].get(), *kw['train']['metrics'].get()]
             )
