@@ -61,6 +61,6 @@ if __name__ == "__main__":
                                  transform=transform)
 
     dataloader_args = {'train': {'dataset': train_dataset},
-                       'test': {'dataset': val_dataset}}
-    runner = DADTorch(dataloader_args=dataloader_args, batch_size=32)
+                       'validation': {'dataset': val_dataset}}
+    runner = DADTorch(dataloader_args=dataloader_args, batch_size=128)
     runner.run(MNISTTrainer)

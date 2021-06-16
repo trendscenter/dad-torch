@@ -5,10 +5,10 @@ added in the ETAverages, DADMetrics respectively.
 
 import abc as _abc
 import time as _time
+from typing import List
 
 import numpy as _np
 import torch as _torch
-from typing import List
 
 from dad_torch.config.state import *
 
@@ -29,7 +29,7 @@ class SerializableMetrics:
         else:
             return object.__getattribute__(self, attribute)
 
-    def serialize(self, **kw):
+    def serialize(self, **kw) -> List:
         """The order of serialization reduction and update method should be same"""
         pass
 
@@ -256,7 +256,7 @@ class ConfusionMatrix(DADMetrics):
         self.matrix = _torch.zeros(self.num_classes, self.num_classes).float()
 
     def update(self, matrix=0, **kw):
-        self.matrix += _torch.tensor(matrix)
+        self.matrix += _torch.tensor(matrix).detach()
 
     def accumulate(self, other: DADMetrics):
         self.matrix += other.matrix
@@ -300,4 +300,4 @@ class ConfusionMatrix(DADMetrics):
                 round(self.precision(), self.num_precision), round(self.recall(), self.num_precision)]
 
     def serialize(self, **kw):
-        return self.matrix
+        return [self.matrix.numpy().tolist()]
