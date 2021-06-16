@@ -514,7 +514,7 @@ class NNTrainer:
     def _global_epoch_end(self, **kw):
         if kw.get('training') is not None:
             self.cache[LogKey.TRAIN_LOG].append(
-                [*kw['train']['averages'].get(), *kw['train']['metrics'].get()]
+                [*kw['training']['averages'].get(), *kw['training']['metrics'].get()]
             )
         if kw.get('validation') is not None:
             self.save_if_better(**kw)
