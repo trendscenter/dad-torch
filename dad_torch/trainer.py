@@ -372,7 +372,7 @@ class NNTrainer:
 
         if self.args.get('use_dad'):
             for mk in self.nn:
-                self.nn[mk].dad_backward()
+                self.nn[mk].dad_backward(reduce_in_rank=MASTER_RANK)
 
         if i % self.args.get('grad_accum_iters', 1) == 0:
             for optim in self.optimizer:

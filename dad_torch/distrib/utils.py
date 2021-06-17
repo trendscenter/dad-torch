@@ -1,5 +1,7 @@
+import torch
 import torch as _torch
 from torch import distributed as _dist
+from torch.nn.parallel import DistributedDataParallel
 
 
 class DADParallel(_torch.nn.Module):
@@ -72,20 +74,47 @@ class DADParallel(_torch.nn.Module):
         output = self.module(*inputs, **kwargs)
         return output
 
-    def _all_gather_concat(self, tensor, *args, **kw):
-        """This function plays the role of remote"""
-        t_list = [_torch.zeros_like(tensor) for _ in range(_dist.get_world_size())]
-        _dist.all_gather(t_list, tensor)
-        t_list = _torch.cat(t_list)
-        return t_list
+    """gather is not implemented in nccl backend"""
+    # def _dad_reduce(self, act_tensor, grad_tensor, dest=0, *args, **kw):
+    #     """This function plays the role of remote"""
+    #     act_gathered = [torch.zeros_like(act_tensor) for _ in range(_dist.get_world_size())]
+    #     grad_gathered = [torch.zeros_like(grad_tensor) for _ in range(_dist.get_world_size())]
+    #
+    #     """Compression here"""
+    #     _dist.gather(act_tensor, act_gathered if _dist.get_rank() == dest else None, dst=dest)
+    #     _dist.gather(grad_tensor, grad_gathered if _dist.get_rank() == dest else None, dst=dest)
+    #
+    #     if _dist.get_rank() == dest:
+    #         act_gathered = _torch.cat(act_gathered)
+    #         grad_gathered = _torch.cat(grad_gathered)
+    #
+    #     _dist.broadcast(act_gathered, src=dest)
+    #     _dist.broadcast(grad_gathered, src=dest)
+    #     """Decompression here"""
+    #
+    #     return act_gathered, grad_gathered
 
-    def dad_backward(self):
+    def _dad_reduce(self, act_tensor, grad_tensor, *args, **kw):
+
+        """This function plays the role of remote"""
+        act_gathered = [_torch.zeros_like(act_tensor) for _ in range(_dist.get_world_size())]
+        grad_gathered = [_torch.zeros_like(grad_tensor) for _ in range(_dist.get_world_size())]
+
+        _dist.all_gather(act_gathered, act_tensor)
+        _dist.all_gather(grad_gathered, grad_tensor)
+
+        act_gathered = _torch.cat(act_gathered)
+        grad_gathered = _torch.cat(grad_gathered)
+
+        return act_gathered, grad_gathered
+
+    def dad_backward(self, reduce_in_rank=0):
         dad_params = dict([(k, v) for k, v in self.module.named_parameters()])
         dad_children = dict([(k, v) for k, v in self.module.named_children()])
 
         for layer in list(dad_children.keys())[::-1]:
-            act_tall = self._all_gather_concat(self._activations[layer], layer=layer, mode='act')
-            local_grad_tall = self._all_gather_concat(self._local_grads[layer], layer=layer, mode='grad')
+            act_tall, local_grad_tall = self._dad_reduce(self._activations[layer], self._local_grads[layer],
+                                                         dest=reduce_in_rank)
             dad_params[f"{layer}.weight"].grad.data = (act_tall.T.mm(local_grad_tall)).T
 
             if dad_params.get(f"{layer}.bias") is not None:
