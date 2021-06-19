@@ -1,7 +1,7 @@
 r"""
 The main core of DADTorch
 """
-
+import datetime
 import math as _math
 import os as _os
 
@@ -15,6 +15,7 @@ from dad_torch.utils.logger import *
 from dad_torch.utils.tensorutils import initialize_weights as _init_weights
 from .distrib import DADParallel
 from .vision import plotter as _log_utils
+import time
 
 _sep = _os.sep
 
@@ -367,17 +368,23 @@ class NNTrainer:
         Learning step for one batch.
         We decoupled it so that user could implement any complex/multi/alternate training strategies.
         """
+        start = time.time()
         it = self.iteration(batch)
-        it['loss'].backward()
 
+        it['loss'].backward()
         if self.args.get('use_dad'):
             for mk in self.nn:
                 self.nn[mk].dad_backward(reduce_in_rank=MASTER_RANK)
+
+        assert self.args.get('grad_accum_iters', 1) == 1, "Gradient accumulation not yet implemented for DAD algorithm."
 
         if i % self.args.get('grad_accum_iters', 1) == 0:
             for optim in self.optimizer:
                 self.optimizer[optim].step()
                 self.optimizer[optim].zero_grad()
+
+        t_del = datetime.datetime.fromtimestamp(time.time()) - datetime.datetime.fromtimestamp(start)
+        self.cache['run_time'] = self.cache.get('run_time', datetime.timedelta(0)) + t_del
         return it
 
     def reduce_scores(self, accumulator: list, distributed=False) -> dict:
