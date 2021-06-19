@@ -373,10 +373,10 @@ class NNTrainer:
 
         it['loss'].backward()
         if self.args.get('use_dad'):
+            assert self.args.get('grad_accum_iters', 1) == 1, \
+                "Gradient accumulation not yet implemented for DAD algorithm."
             for mk in self.nn:
                 self.nn[mk].dad_backward(reduce_in_rank=MASTER_RANK)
-
-        assert self.args.get('grad_accum_iters', 1) == 1, "Gradient accumulation not yet implemented for DAD algorithm."
 
         if i % self.args.get('grad_accum_iters', 1) == 0:
             for optim in self.optimizer:
