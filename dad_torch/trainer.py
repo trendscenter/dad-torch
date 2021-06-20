@@ -84,11 +84,7 @@ class NNTrainer:
             If it is an dad_torch checkpoint, try loading all the models.
             If it is not, assume it's weights to a single model and laod to first model.
         """
-        try:
-            chk = _torch.load(full_path)
-        except:
-            chk = _torch.load(full_path, map_location='cpu')
-
+        chk = _torch.load(full_path, map_location=_torch.device('cpu'))
         if chk.get('_its_origin_', 'Unknown').lower() == src:
             if load_model_state:
                 for m in chk['models']:
