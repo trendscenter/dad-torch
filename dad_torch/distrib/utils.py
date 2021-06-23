@@ -1,7 +1,5 @@
-import torch
 import torch as _torch
 from torch import distributed as _dist
-from torch.nn.parallel import DistributedDataParallel
 
 
 class DADParallel(_torch.nn.Module):
@@ -94,7 +92,7 @@ class DADParallel(_torch.nn.Module):
     #
     #     return act_gathered, grad_gathered
 
-    def _dad_reduce(self, act_tensor, grad_tensor, dest=None, *args, **kw):
+    def _dad_reduce(self, act_tensor, grad_tensor, *args, **kw):
 
         """This function plays the role of remote"""
         act_gathered = [_torch.zeros_like(act_tensor) for _ in range(_dist.get_world_size())]
