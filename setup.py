@@ -26,5 +26,5 @@ setup(
     packages=['dad_torch', 'dad_torch.config', 'dad_torch.data', 'dad_torch.distrib', 'dad_torch.metrics', 'dad_torch.utils', 'dad_torch.vision'],
     include_package_data=True,
     install_requires=['numpy', 'scipy', 'scikit-learn', 'scikit-image',
-                      'pillow', 'matplotlib', 'opencv-python-headless', 'pandas', 'seaborn']
+                      'pillow', 'matplotlib', 'opencv-python-headless', 'pandas', 'seaborn', 'easytorch']
 )
