@@ -7,4 +7,7 @@ matplotlib==3.4.2
 opencv-python-headless==4.5.1.48
 pandas==1.2.5
 seaborn==0.10.1
+-f https://download.pytorch.org/whl/torch_stable.html
+torch==1.9.0+cu111
+torchvision==0.10.0+cu111
 easytorch==2.9.2

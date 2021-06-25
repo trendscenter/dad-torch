@@ -17,7 +17,7 @@ model = utils.DADParallel(...) # See trainer.py for the exact usage.
 3. RUN chmod u+x deploy.sh
 4. RUN ./deploy.sh
 5. RUN cd examples
-6. RUN python MNIST_dadtorch.py -ph train -dad True -seed 1
+6. RUN python MNIST_dadtorch.py -ph train -ddp True --dad-reduction True -seed 1 -seed-all True
 
 #### Development ####
 Any changes made in the code can be deployed as ./deploy.sh
