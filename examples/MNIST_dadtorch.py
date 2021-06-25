@@ -33,6 +33,7 @@ class MNISTTrainer(NNTrainer):
     def iteration(self, batch):
         inputs = torch.flatten(batch[0].to(self.device['gpu']).float(), 1)
         labels = batch[1].to(self.device['gpu']).long()
+        # print('***********: ', self.device['gpu'], torch.initial_seed())
 
         out = self.nn['model'](inputs)
         loss = F.nll_loss(out, labels)
@@ -54,13 +55,20 @@ class MNISTTrainer(NNTrainer):
         return ConfusionMatrix(num_classes=10)
 
 
-if __name__ == "__main__":
-    train_dataset = datasets.MNIST('data', train=True, download=True,
-                                   transform=transform)
-    val_dataset = datasets.MNIST('data', train=False,
-                                 transform=transform)
+train_dataset = datasets.MNIST('data', train=True, download=True,
+                               transform=transform)
+val_dataset = datasets.MNIST('data', train=False,
+                             transform=transform)
+itr = 128 * 5
+train_dataset.data = train_dataset.data[:itr].clone()
+train_dataset.target = train_dataset.targets[:itr].clone()
 
-    dataloader_args = {'train': {'dataset': train_dataset},
-                       'validation': {'dataset': val_dataset}}
+val_dataset.data = val_dataset.data[:itr].clone()
+val_dataset.target = val_dataset.targets[:itr].clone()
+
+dataloader_args = {'train': {'dataset': train_dataset},
+                   'validation': {'dataset': val_dataset}}
+
+if __name__ == "__main__":
     runner = DADTorch(dataloader_args=dataloader_args, batch_size=128)
     runner.run(MNISTTrainer)
