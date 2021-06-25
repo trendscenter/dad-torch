@@ -21,7 +21,7 @@ model = utils.DADParallel(...) # See trainer.py for the exact usage.
 
 #### Development ####
 Any changes made in the code can be deployed as ./deploy.sh
-Use runtime_plotter.py in examples to compare different runtimes.
+Use runtime_plotter.py in examples to compare different runtimes(samples in example folder).
 
 ### Known issues
 * gather is not exposed in pytorch DDP backend. So we have used all_gather at the moment.
