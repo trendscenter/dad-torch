@@ -49,11 +49,11 @@ default_ap.add_argument('-nf', '--num_folds', default=None, type=int, help='Numb
 default_ap.add_argument('-spl', '--split_ratio', default=None, nargs='*', type=float,
                         help='Split ratio. Eg: 0.6 0.2 0.2 or 0.8 0.2. Exclusive to num_fold.')
 
-default_ap.add_argument('-dad', '--use_dad', default=False, type=boolean_string, help='Use DAD?')
+default_ap.add_argument('-ddp', '--use_ddp', default=False, type=boolean_string, help='Use DDP?')
 
 _im, _ = default_ap.parse_known_args()
 _args = vars(_im)
-if _args.get('use_dad'):
+if _args.get('use_ddp'):
     default_ap.add_argument('--node-rank', default=0, type=int,
                             help='Node rank for distributed training')
     default_ap.add_argument('--num-nodes', default=1, type=int,
@@ -69,6 +69,8 @@ if _args.get('use_dad'):
                             help='Master node address.')
     default_ap.add_argument('--master-port', default='8998', type=str,
                             help='Master node address.')
+    default_ap.add_argument('--dad-reduction', default=False, type=boolean_string,
+                            help='Will use DAD by master rank for reduction.')
 
 _known, _unknown = default_ap.parse_known_args()
 default_args = vars(_known)

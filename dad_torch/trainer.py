@@ -119,12 +119,19 @@ class NNTrainer:
         If no GPU is present, CPU is used.
         """
 
-        if self.args.get('use_dad'):
-            for model_key in self.nn:
-                self.nn[model_key] = self.nn[model_key].to(self.device['gpu'])
-            for model_key in self.nn:
-                self.nn[model_key] = DADParallel(module=self.nn[model_key], device=self.device['gpu'],
-                                                 rank=_dist.get_rank())
+        if self.args.get('use_ddp'):
+            if self.args.get('dad_reduction'):
+                for model_key in self.nn:
+                    self.nn[model_key] = self.nn[model_key].to(self.device['gpu'])
+                for model_key in self.nn:
+                    self.nn[model_key] = DADParallel(module=self.nn[model_key], device=self.device['gpu'],
+                                                     rank=_dist.get_rank())
+            else:
+                for model_key in self.nn:
+                    self.nn[model_key] = self.nn[model_key].to(self.device['gpu'])
+                for model_key in self.nn:
+                    self.nn[model_key] = _torch.nn.parallel.DistributedDataParallel(self.nn[model_key],
+                                                                                    device_ids=[self.device['gpu']])
 
         elif len(self.args['gpus']) >= 1:
             self.device['gpu'] = _torch.device(f"cuda:{self.args['gpus'][0]}")
@@ -368,7 +375,7 @@ class NNTrainer:
         it = self.iteration(batch)
 
         it['loss'].backward()
-        if self.args.get('use_dad'):
+        if self.args.get('dad_reduction'):
             assert self.args.get('grad_accum_iters', 1) == 1, \
                 "Gradient accumulation not yet implemented for DAD algorithm."
             for mk in self.nn:
@@ -379,8 +386,12 @@ class NNTrainer:
                 self.optimizer[optim].step()
                 self.optimizer[optim].zero_grad()
 
+        """ Timer logic to track runtime of each batch"""
         t_del = datetime.datetime.fromtimestamp(time.time()) - datetime.datetime.fromtimestamp(start)
-        self.cache['run_time'] = self.cache.get('run_time', datetime.timedelta(0)) + t_del
+        if self.cache.get('batch_run_time') is None:
+            self.cache['batch_run_time'] = [t_del.total_seconds() * 1000]  # To millis
+        else:
+            self.cache['batch_run_time'].append(t_del.total_seconds() * 1000)  # To millis
         return it
 
     def reduce_scores(self, accumulator: list, distributed=False) -> dict:
@@ -424,7 +435,7 @@ class NNTrainer:
     def validation(self, epoch, dataset) -> dict:
         return self.evaluation(epoch=epoch, mode='validation',
                                dataset=dataset,
-                               distributed=self.args['use_dad'],
+                               distributed=self.args['use_ddp'],
                                use_unpadded_sampler=True)
 
     def _global_debug(self, running_averages, running_metrics, **kw):
@@ -442,7 +453,7 @@ class NNTrainer:
                 self.args['verbose'])
             r"""Debug and reset running accumulators"""
 
-            if not self.args['use_dad']:
+            if not self.args['use_ddp']:
                 """Plot only in non-dad mode to maintain consistency"""
                 self.cache[LogKey.TRAIN_LOG].append([*running_averages.get(), *running_metrics.get()])
 
@@ -455,7 +466,7 @@ class NNTrainer:
             handle_key='train',
             shuffle=True,
             dataset=train_dataset,
-            distributed=self.args['use_dad']
+            distributed=self.args['use_ddp']
         )
 
         for ep in range(1, self.args['epochs'] + 1):
@@ -471,7 +482,7 @@ class NNTrainer:
             """Keep track of running metrics and averages for logging/plotting"""
             _metrics, _avg = self.new_metrics(), self.new_averages()
 
-            if self.args.get('use_dad'):
+            if self.args.get('use_ddp'):
                 train_loader.sampler.set_epoch(ep)
 
             num_iters = len(train_loader) // self.args['grad_accum_iters']
@@ -494,7 +505,7 @@ class NNTrainer:
 
             reduced_epoch = self.reduce_scores(
                 [{'averages': epoch_avg, 'metrics': epoch_metrics}],
-                distributed=self.args['use_dad']
+                distributed=self.args['use_ddp']
             )
 
             epoch_out = {'epoch': ep, 'training': reduced_epoch}
@@ -502,7 +513,7 @@ class NNTrainer:
             """Validation step"""
             if validation_dataset is not None:
                 val_out = self.validation(ep, validation_dataset)
-                epoch_out['validation'] = self.reduce_scores([val_out], distributed=self.args['use_dad'])
+                epoch_out['validation'] = self.reduce_scores([val_out], distributed=self.args['use_ddp'])
 
             self._on_epoch_end(**epoch_out)
             if self.args['is_master']:

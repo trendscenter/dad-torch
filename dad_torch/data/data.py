@@ -201,7 +201,7 @@ class ETDataHandle:
         for ix, f in enumerate(files, 1):
             _files.append([ix, f])
 
-        nw = min(num_workers(args, args, args['use_dad']), len(_files))
+        nw = min(num_workers(args, args, args['use_ddp']), len(_files))
         with _mp.Pool(processes=max(1, nw)) as pool:
             return list(
                 pool.starmap(

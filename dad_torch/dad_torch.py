@@ -135,7 +135,7 @@ class DADTorch:
         self._init_dataspecs(dataspecs)
 
         self._device_check()
-        self._dad_setup()
+        self._ddp_setup()
         self._make_reproducible()
         self.args.update(is_master=self.args.get('is_master', True))
 
@@ -147,13 +147,14 @@ class DADTorch:
                  f"Using {str(NUM_GPUS) + ' GPU(s)' if CUDA_AVAILABLE else 'CPU(Much slower)'}.")
             self.args['gpus'] = list(range(NUM_GPUS))
 
-    def _dad_setup(self):
-        if all([self.args['use_dad'], NUM_GPUS >= 1, len(self.args['gpus']) >= 1]):
+    def _ddp_setup(self):
+        if all([self.args['use_ddp'], NUM_GPUS >= 1, len(self.args['gpus']) >= 1]):
             self.args['num_gpus'] = len(self.args['gpus'])
             _os.environ['MASTER_ADDR'] = self.args.get('master_addr', '127.0.0.1')  #
             _os.environ['MASTER_PORT'] = self.args.get('master_port', '12355')
         else:
-            self.args['use_dad'] = False
+            self.args['use_ddp'] = False
+            self.args['dad_reduction'] = False
 
     def _show_args(self):
         info('Starting with the following parameters:', self.args['verbose'])
@@ -169,7 +170,7 @@ class DADTorch:
             raise ValueError('2nd Argument of DADTorch could be only one of :ArgumentParser, dict')
 
     def _make_reproducible(self):
-        if self.args['use_dad'] and self.args['seed'] is None:
+        if self.args['use_ddp'] and self.args['seed'] is None:
             raise ValueError('Seed must be explicitly given as seed=<seed> (Eg.1, 2, 101, 102) in DAD.')
 
         if self.args['seed'] is None:
@@ -277,7 +278,7 @@ class DADTorch:
     def run(self, trainer_cls: typing.Type[NNTrainer],
             dataset_cls: typing.Type[ETDataset] = None,
             data_handle_cls: typing.Type[ETDataHandle] = ETDataHandle):
-        if self.args.get('use_dad'):
+        if self.args.get('use_ddp'):
             _mp.spawn(_dad_worker, nprocs=self.args['num_gpus'],
                       args=(self, trainer_cls, dataset_cls, data_handle_cls))
         else:
@@ -325,12 +326,12 @@ class DADTorch:
                     )
                     test_accum.append(self._test(split_file, trainer, test_dataset))
 
-                if trainer.args.get('use_dad'):
+                if trainer.args.get('use_ddp'):
                     _dist.barrier()
 
             if self.args['is_master']:
                 global_scores = trainer.reduce_scores(test_accum, distributed=False)
                 self._global_experiment_end(trainer, global_scores)
 
-            if trainer.args.get('use_dad'):
+            if trainer.args.get('use_ddp'):
                 _dist.barrier()
