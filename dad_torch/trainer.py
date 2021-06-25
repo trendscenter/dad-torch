@@ -452,11 +452,6 @@ class NNTrainer:
                 f"Ep:{e}/{self.args['epochs']},Itr:{i}/{N}, Averages:{running_averages.get()}, Metrics:{running_metrics.get()}",
                 self.args['verbose'])
             r"""Debug and reset running accumulators"""
-
-            if not self.args['use_ddp']:
-                """Plot only in non-dad mode to maintain consistency"""
-                self.cache[LogKey.TRAIN_LOG].append([*running_averages.get(), *running_metrics.get()])
-
             running_averages.reset(), running_metrics.reset()
 
     def train(self, train_dataset, validation_dataset) -> None:
