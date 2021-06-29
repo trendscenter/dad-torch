@@ -10,8 +10,9 @@ import os
 p1 = '../net_logs/experiment/experiment_log.json'
 p2 = '../net_logs_DDP/experiment/experiment_log.json'
 p3 = '../net_logs_DAD/experiment/experiment_log.json'
+p4 = '../net_logs_DAD_NO_BK/experiment/experiment_log.json'
 
-paths = [p1, p2, p3]
+paths = [p1, p2, p3, p4]
 if len(sys.argv) > 1:
     paths = sys.argv[1:]
 
@@ -25,11 +26,13 @@ for p in paths:
     j = json.load(open(p))
     data.append(j['batch_run_time'][skip:])
     data_cumu.append(np.cumsum(j['batch_run_time'][skip:]))
+
 data = np.array(data).T
 data_cumu = np.array(data_cumu).T
 
-colors = ['green', 'magenta', 'red']
-header = ['Single process', 'DDP', 'DAD']
+colors = ['green', 'magenta', 'red', 'blue', 'cyan', 'yellow']
+colors = colors[:len(paths)]
+header = ['Single GPU', 'DDP', 'DAD', 'DAD_NO_BK']
 df = pd.DataFrame(data=data, columns=header)[skip:]
 df.plot(color=colors)
 plt.ylabel('Millis')

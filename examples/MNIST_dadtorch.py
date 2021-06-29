@@ -3,7 +3,12 @@ import torch.nn.functional as F
 from torch import nn
 from torchvision import datasets, transforms
 
-from dad_torch import DADTorch, NNTrainer, ConfusionMatrix
+from dad_torch import DADTorch, NNTrainer, ConfusionMatrix, default_ap
+from dad_torch.config import boolean_string
+import argparse
+
+ap = argparse.ArgumentParser(parents=[default_ap], add_help=False)
+ap.add_argument('--ignore-backward', default=False, type=boolean_string, help='Ignore .backward in runtime.')
 
 transform = transforms.Compose([
     transforms.ToTensor(),
@@ -15,14 +20,18 @@ transform = transforms.Compose([
 class MNISTNet(nn.Module):
     def __init__(self):
         super(MNISTNet, self).__init__()
-        self.l1 = nn.Linear(784, 512, bias=True)
-        self.l2 = nn.Linear(512, 256, bias=True)
-        self.l3 = nn.Linear(256, 10, bias=True)
+        self.l1 = nn.Linear(784, 1024, bias=True)
+        self.l2 = nn.Linear(1024, 512, bias=True)
+        self.l3 = nn.Linear(512, 256, bias=True)
+        self.l4 = nn.Linear(256, 128, bias=True)
+        self.l5 = nn.Linear(128, 10, bias=True)
 
     def forward(self, x):
         x = F.relu(self.l1(x))
         x = F.relu(self.l2(x))
-        output = F.log_softmax(self.l3(x), dim=1)
+        x = F.relu(self.l3(x))
+        x = F.relu(self.l4(x))
+        output = F.log_softmax(self.l5(x), dim=1)
         return output
 
 
@@ -59,7 +68,7 @@ train_dataset = datasets.MNIST('data', train=True, download=True,
                                transform=transform)
 val_dataset = datasets.MNIST('data', train=False,
                              transform=transform)
-itr = 128 * 5
+itr = 128 * 50
 train_dataset.data = train_dataset.data[:itr].clone()
 train_dataset.target = train_dataset.targets[:itr].clone()
 
@@ -70,5 +79,5 @@ dataloader_args = {'train': {'dataset': train_dataset},
                    'validation': {'dataset': val_dataset}}
 
 if __name__ == "__main__":
-    runner = DADTorch(dataloader_args=dataloader_args, batch_size=128)
+    runner = DADTorch(dataloader_args=dataloader_args, args=ap, batch_size=128)
     runner.run(MNISTTrainer)

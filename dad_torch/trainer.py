@@ -374,7 +374,10 @@ class NNTrainer:
         start = time.time()
         it = self.iteration(batch)
 
+        bk_start = time.time()
         it['loss'].backward()
+        bk_del = datetime.datetime.fromtimestamp(time.time()) - datetime.datetime.fromtimestamp(bk_start)
+
         if self.args.get('dad_reduction'):
             assert self.args.get('grad_accum_iters', 1) == 1, \
                 "Gradient accumulation not yet implemented for DAD algorithm."
@@ -388,6 +391,9 @@ class NNTrainer:
 
         """ Timer logic to track runtime of each batch"""
         t_del = datetime.datetime.fromtimestamp(time.time()) - datetime.datetime.fromtimestamp(start)
+        if self.args.get('ignore_backward'):
+            t_del = t_del - bk_del
+
         if self.cache.get('batch_run_time') is None:
             self.cache['batch_run_time'] = [t_del.total_seconds() * 1000]  # To millis
         else:
