@@ -59,7 +59,7 @@ if _args.get('use_ddp'):
     default_ap.add_argument('--num-nodes', default=1, type=int,
                             help='Number of nodes for distributed training')
     default_ap.add_argument('--world-size', default=None, type=int,
-                            help='World size(Total participating processes(GPUs))')
+                            help='World size(Total participating processes(CPU training only))')
     default_ap.add_argument('--dist-url', default='env://', type=str,
                             help='Url used to set up distributed training.')
     default_ap.add_argument('--dist-backend', default='nccl', type=str,

@@ -1,7 +1,9 @@
 #!/bin/bash
-python MNIST_dadtorch.py -ph train -seed 1 -f true -seed-all True -log net_logs -e 101 -gpus 0
-python MNIST_dadtorch.py -ph train -ddp True -seed 1 -f true -seed-all True --dad-reduction False -log net_logs_DDP -e 101 --ignore-backward False
-python MNIST_dadtorch.py -ph train -ddp True -seed 1 -f true -seed-all True --dad-reduction True -log net_logs_DAD -e 101 --ignore-backward False
-python MNIST_dadtorch.py -ph train -ddp True -seed 1 -f true -seed-all True --dad-reduction True -log net_logs_DAD_NO_BK -e 101 --ignore-backward True
+#python3 MNIST_dadtorch.py -ph train -seed 1 -f true -seed-all True -log net_logs_ONE -e 51
+python3 MNIST_dadtorch.py -ph train -ddp True -seed 1 -f true -seed-all True --dad-reduction False -log net_logs_DDP -e 51 --node-rank 0 --world-size 4 --dist-backend gloo
+python3 MNIST_dadtorch.py -ph train -ddp True -seed 1 -f true -seed-all True --dad-reduction True -log net_logs_DAD_AG -e 51 --node-rank 0 --world-size 4 --dist-backend gloo --comm-mode ag --ignore-backwards False
+python3 MNIST_dadtorch.py -ph train -ddp True -seed 1 -f true -seed-all True --dad-reduction True -log net_logs_DAD_AG-IB -e 51 --node-rank 0 --world-size 4 --dist-backend gloo --comm-mode ag --ignore-backwards True
+python3 MNIST_dadtorch.py -ph train -ddp True -seed 1 -f true -seed-all True --dad-reduction True -log net_logs_DAD_BC -e 51 --node-rank 0 --world-size 4 --dist-backend gloo --comm-mode bc --ignore-backwards False
+python3 MNIST_dadtorch.py -ph train -ddp True -seed 1 -f true -seed-all True --dad-reduction True -log net_logs_DAD_BC-IB -e 51 --node-rank 0 --world-size 4 --dist-backend gloo --comm-mode bc --ignore-backwards True
 
 
