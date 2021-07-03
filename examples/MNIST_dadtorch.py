@@ -21,11 +21,11 @@ transform = transforms.Compose([
 class MNISTNet(nn.Module):
     def __init__(self):
         super(MNISTNet, self).__init__()
-        self.l1 = nn.Linear(784, 1024, bias=True)
-        self.l2 = nn.Linear(1024, 512, bias=True)
-        self.l3 = nn.Linear(512, 256, bias=True)
-        self.l4 = nn.Linear(256, 128, bias=True)
-        self.l5 = nn.Linear(128, 10, bias=True)
+        self.l1 = nn.Linear(784, 2048, bias=True)
+        self.l2 = nn.Linear(2048, 1024, bias=True)
+        self.l3 = nn.Linear(1024, 512, bias=True)
+        self.l4 = nn.Linear(512, 256, bias=True)
+        self.l5 = nn.Linear(256, 10, bias=True)
 
     def forward(self, x):
         x = F.relu(self.l1(x))

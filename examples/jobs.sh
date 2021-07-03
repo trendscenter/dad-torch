@@ -1,7 +1,7 @@
 #!/bin/bash
 NUM_SITES=(2 4 8)
 BATCH_SIZES=(16 64 128)
-EPOCH=101
+EPOCH=51
 PHASE="train"
 BACKEND="gloo"
 
