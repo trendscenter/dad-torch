@@ -1,8 +1,5 @@
-import time
-
 import torch as _torch
 from torch import distributed as _dist
-from dad_torch.utils.logger import duration
 
 _GATHER_BROADCAST_BACKENDS = ['mpi', 'gloo']
 _ALL_GATHER_BACKENDS = ['nccl']
@@ -112,8 +109,7 @@ class DADParallel(_torch.nn.Module):
         for layer in list(dad_children.keys())[::-1]:
             act_tall, local_grad_tall = [_torch.ones(1)] * 2
 
-            _start = time.time()
-            if self.args['comm_mode'].lower() == 'ag':
+            if self.args.get('comm_mode', 'ag').lower() == 'ag':
                 act_tall, local_grad_tall = self._dad_reduce_all_gather(self._activations[layer],
                                                                         self._local_grads[layer],
                                                                         dest=reduce_in_rank)
@@ -121,11 +117,8 @@ class DADParallel(_torch.nn.Module):
                 act_tall, local_grad_tall = self._dad_reduce_gather_broadcast(self._activations[layer],
                                                                               self._local_grads[layer],
                                                                               dest=reduce_in_rank)
-            duration(self.cache, _start, f'{layer}_reduction_duration')
 
             """Update weights"""
-            _start = time.time()
             dad_params[f"{layer}.weight"].grad.data = (act_tall.T.mm(local_grad_tall)).T
             if dad_params.get(f"{layer}.bias") is not None:
                 dad_params[f"{layer}.bias"].grad.data = local_grad_tall.sum(0)
-            duration(self.cache, _start, f"{layer}_update_duration")
