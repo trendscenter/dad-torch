@@ -26,6 +26,7 @@ header = [p.split(os.sep)[-1].split('_')[-1] for p in paths]
 
 skip = 5
 for k in keys:
+    print(f"Working on key {k}...")
     data_cumu = []
     for p in paths:
         data_cumu.append(np.cumsum(get_log(p).get(k, [])[skip:]))
