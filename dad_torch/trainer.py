@@ -126,13 +126,19 @@ class NNTrainer:
                     self.nn[model_key] = self.nn[model_key].to(self.device['gpu'])
                 for model_key in self.nn:
                     self.nn[model_key] = DADParallel(module=self.nn[model_key], device=self.device['gpu'],
-                                                     rank=_dist.get_rank())
+                                                     args=self.args, cache=self.cache)
             else:
                 for model_key in self.nn:
                     self.nn[model_key] = self.nn[model_key].to(self.device['gpu'])
                 for model_key in self.nn:
-                    self.nn[model_key] = _torch.nn.parallel.DistributedDataParallel(self.nn[model_key],
-                                                                                    device_ids=[self.device['gpu']])
+                    _device_ids = []
+                    if self.args['gpu'] is not None:
+                        _device_ids.append(self.device['gpu'])
+
+                    self.nn[model_key] = _torch.nn.parallel.DistributedDataParallel(
+                        self.nn[model_key],
+                        device_ids=_device_ids
+                    )
 
         elif len(self.args['gpus']) >= 1:
             self.device['gpu'] = _torch.device(f"cuda:{self.args['gpus'][0]}")
@@ -372,13 +378,24 @@ class NNTrainer:
         Learning step for one batch.
         We decoupled it so that user could implement any complex/multi/alternate training strategies.
         """
-        start = time.time()
-        it = self.iteration(batch)
+        total_duration = datetime.timedelta(0)
 
+        _start = time.time()
+        it = self.iteration(batch)
+        total_duration = total_duration + duration(self.cache, _start, 'forward_duration')
+
+        _start = time.time()
         it['loss'].backward()
+        bk_del = duration(self.cache, _start, 'backward_duration')
+
+        if not self.args.get('dad_reduction') or not self.args.get('ignore_backwards', True):
+            total_duration = total_duration + bk_del
+
         if self.args.get('dad_reduction'):
             assert self.args.get('grad_accum_iters', 1) == 1, \
                 "Gradient accumulation not yet implemented for DAD algorithm."
+
+            _start = time.time()
             for mk in self.nn:
                 self.nn[mk].dad_backward(reduce_in_rank=MASTER_RANK)
         
@@ -387,18 +404,14 @@ class NNTrainer:
                 "Gradient accumulation not yet implemented for DAD algorithm."
             for mk in self.nn:                
                 self.nn[mk].rankdad_backward(reduce_in_rank=MASTER_RANK)
+        total_duration = total_duration + duration(self.cache, _start, 'dad_backward_duration')
+
+        duration(self.cache, None, 'batch_duration', t_del=total_duration)
 
         if i % self.args.get('grad_accum_iters', 1) == 0:
             for optim in self.optimizer:
                 self.optimizer[optim].step()
                 self.optimizer[optim].zero_grad()
-
-        """ Timer logic to track runtime of each batch"""
-        t_del = datetime.datetime.fromtimestamp(time.time()) - datetime.datetime.fromtimestamp(start)
-        if self.cache.get('batch_run_time') is None:
-            self.cache['batch_run_time'] = [t_del.total_seconds() * 1000]  # To millis
-        else:
-            self.cache['batch_run_time'].append(t_del.total_seconds() * 1000)  # To millis
         return it
 
     def reduce_scores(self, accumulator: list, distributed=False) -> dict:

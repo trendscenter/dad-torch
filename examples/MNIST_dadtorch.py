@@ -3,7 +3,13 @@ import torch.nn.functional as F
 from torch import nn
 from torchvision import datasets, transforms
 
-from dad_torch import DADTorch, NNTrainer, ConfusionMatrix
+from dad_torch import DADTorch, NNTrainer, ConfusionMatrix, default_ap
+from dad_torch.config import boolean_string
+import argparse
+
+ap = argparse.ArgumentParser(parents=[default_ap], add_help=False)
+ap.add_argument('--ignore-backward', default=True, type=boolean_string, help='Ignore .backward in runtime record.')
+ap.add_argument('--comm-mode', default='ag', type=str, help='gather broadcast(BC) or all_gather(AG)')
 
 transform = transforms.Compose([
     transforms.ToTensor(),
@@ -15,14 +21,18 @@ transform = transforms.Compose([
 class MNISTNet(nn.Module):
     def __init__(self):
         super(MNISTNet, self).__init__()
-        self.l1 = nn.Linear(784, 512, bias=True)
-        self.l2 = nn.Linear(512, 256, bias=True)
-        self.l3 = nn.Linear(256, 10, bias=True)
+        self.l1 = nn.Linear(784, 2048, bias=True)
+        self.l2 = nn.Linear(2048, 1024, bias=True)
+        self.l3 = nn.Linear(1024, 512, bias=True)
+        self.l4 = nn.Linear(512, 256, bias=True)
+        self.l5 = nn.Linear(256, 10, bias=True)
 
     def forward(self, x):
         x = F.relu(self.l1(x))
         x = F.relu(self.l2(x))
-        output = F.log_softmax(self.l3(x), dim=1)
+        x = F.relu(self.l3(x))
+        x = F.relu(self.l4(x))
+        output = F.log_softmax(self.l5(x), dim=1)
         return output
 
 
@@ -59,16 +69,16 @@ train_dataset = datasets.MNIST('data', train=True, download=True,
                                transform=transform)
 val_dataset = datasets.MNIST('data', train=False,
                              transform=transform)
-itr = 128 * 5
-train_dataset.data = train_dataset.data[:itr].clone()
-train_dataset.target = train_dataset.targets[:itr].clone()
+iter = 64 * 100
+train_dataset.data = train_dataset.data[:iter].clone()
+train_dataset.target = train_dataset.targets[:iter].clone()
 
-val_dataset.data = val_dataset.data[:itr].clone()
-val_dataset.target = val_dataset.targets[:itr].clone()
+val_dataset.data = val_dataset.data[:iter].clone()
+val_dataset.target = val_dataset.targets[:iter].clone()
 
 dataloader_args = {'train': {'dataset': train_dataset},
                    'validation': {'dataset': val_dataset}}
 
 if __name__ == "__main__":
-    runner = DADTorch(dataloader_args=dataloader_args, batch_size=128)
+    runner = DADTorch(dataloader_args=dataloader_args, args=ap, seed=111, seed_all=True, force=True)
     runner.run(MNISTTrainer)

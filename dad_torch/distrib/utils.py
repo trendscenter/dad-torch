@@ -2,19 +2,18 @@ import torch as _torch
 from torch import distributed as _dist
 from dad_torch.power_iteration_BC import power_iteration_BC
 
+_GATHER_BROADCAST_BACKENDS = ['mpi', 'gloo']
+_ALL_GATHER_BACKENDS = ['nccl']
+
 
 class DADParallel(_torch.nn.Module):
-    def __init__(self, module, device=None, rank=None, **kw):
+    def __init__(self, module, device=None, **kw):
         assert _dist.is_initialized(), "*** Default process group is not initialized. ***"
-
-        self.rank = rank
-        if self.rank is None:
-            self.rank = _dist.get_rank()
-
-        self.debug = self.rank == 0
         super(DADParallel, self).__init__()
         self.module = module
         self.device = device
+        self.args = kw.get('args', {})
+        self.cache = kw.get('cache', {})
         self._reset()
 
     def _reset(self):
@@ -23,10 +22,7 @@ class DADParallel(_torch.nn.Module):
         self._activations = {}
         self._local_grads = {}
 
-    def _hook_fn(self, rank, hook_type, layer, debug=False):
-        if debug:
-            print(f"**** {rank}, {hook_type}, {layer} ****")
-
+    def _hook_fn(self, hook_type, layer):
         def get(m, in_grad, out_grad):
             if hook_type.lower() == 'forward':
                 for i, b in enumerate(in_grad):
@@ -45,10 +41,10 @@ class DADParallel(_torch.nn.Module):
         if self.training:
             for layer, ch in list(self.module.named_children()):
                 self.fw_hooks_handle.append(
-                    ch.register_forward_hook(self._hook_fn(self.rank, 'forward', layer))
+                    ch.register_forward_hook(self._hook_fn('forward', layer))
                 )
                 self.bk_hooks_handle.append(
-                    ch.register_backward_hook(self._hook_fn(self.rank, 'backward', layer))
+                    ch.register_backward_hook(self._hook_fn('backward', layer))
                 )
 
     def _unhook(self):
@@ -74,26 +70,26 @@ class DADParallel(_torch.nn.Module):
         return output
 
     """gather is not implemented in nccl backend"""
-    # def _dad_reduce(self, act_tensor, grad_tensor, dest=0, *args, **kw):
-    #     """This function plays the role of remote"""
-    #     act_gathered = [torch.zeros_like(act_tensor) for _ in range(_dist.get_world_size())]
-    #     grad_gathered = [torch.zeros_like(grad_tensor) for _ in range(_dist.get_world_size())]
-    #
-    #     """Compression here"""
-    #     _dist.gather(act_tensor, act_gathered if _dist.get_rank() == dest else None, dst=dest)
-    #     _dist.gather(grad_tensor, grad_gathered if _dist.get_rank() == dest else None, dst=dest)
-    #
-    #     if _dist.get_rank() == dest:
-    #         act_gathered = _torch.cat(act_gathered)
-    #         grad_gathered = _torch.cat(grad_gathered)
-    #
-    #     _dist.broadcast(act_gathered, src=dest)
-    #     _dist.broadcast(grad_gathered, src=dest)
-    #     """Decompression here"""
-    #
-    #     return act_gathered, grad_gathered
 
-    def _dad_reduce(self, act_tensor, grad_tensor, *args, **kw):
+    def _dad_reduce_gather_broadcast(self, act_tensor, grad_tensor, dest=0, *args, **kw):
+        """This function plays the role of remote"""
+        act_gathered = [_torch.zeros_like(act_tensor) for _ in range(_dist.get_world_size())]
+        grad_gathered = [_torch.zeros_like(grad_tensor) for _ in range(_dist.get_world_size())]
+
+        """Compression here"""
+        _dist.gather(act_tensor, act_gathered if _dist.get_rank() == dest else None, dst=dest)
+        _dist.gather(grad_tensor, grad_gathered if _dist.get_rank() == dest else None, dst=dest)
+
+        act_gathered = _torch.cat(act_gathered)
+        grad_gathered = _torch.cat(grad_gathered)
+
+        _dist.broadcast(act_gathered, src=dest)
+        _dist.broadcast(grad_gathered, src=dest)
+        """Decompression here"""
+
+        return act_gathered, grad_gathered
+
+    def _dad_reduce_all_gather(self, act_tensor, grad_tensor, *args, **kw):
 
         """This function plays the role of remote"""
         act_gathered = [_torch.zeros_like(act_tensor) for _ in range(_dist.get_world_size())]
@@ -125,12 +121,19 @@ class DADParallel(_torch.nn.Module):
         dad_children = dict([(k, v) for k, v in self.module.named_children()])
 
         for layer in list(dad_children.keys())[::-1]:
-            print(("SHAPE", str(self._local_grads[layer].shape), str(self._activations[layer].shape)), self._local_grads[layer].device, self._activations[layer].device)
-            act_tall, local_grad_tall = self._dad_reduce(self._activations[layer], self._local_grads[layer],
-                                                         dest=reduce_in_rank)
-            print("PRE-REDUCE", act_tall.shape, local_grad_tall.shape)                                                         
-            dad_params[f"{layer}.weight"].grad.data = (act_tall.T.mm(local_grad_tall)).T
+            act_tall, local_grad_tall = [_torch.ones(1)] * 2
 
+            if self.args.get('comm_mode', 'ag').lower() == 'ag':
+                act_tall, local_grad_tall = self._dad_reduce_all_gather(self._activations[layer],
+                                                                        self._local_grads[layer],
+                                                                        dest=reduce_in_rank)
+            elif self.args['comm_mode'].lower() == 'bc':
+                act_tall, local_grad_tall = self._dad_reduce_gather_broadcast(self._activations[layer],
+                                                                              self._local_grads[layer],
+                                                                              dest=reduce_in_rank)
+
+            """Update weights"""
+            dad_params[f"{layer}.weight"].grad.data = (act_tall.T.mm(local_grad_tall)).T
             if dad_params.get(f"{layer}.bias") is not None:
                 dad_params[f"{layer}.bias"].grad.data = local_grad_tall.sum(0)
 

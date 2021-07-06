@@ -20,13 +20,13 @@ from dad_torch.utils.logger import *
 _sep = _os.sep
 
 
-def _dad_worker(gpu, self, trainer_cls, dataset_cls, data_handle_cls):
-    self.args['gpu'] = gpu
-    self.args['verbose'] = gpu == MASTER_RANK
+def _dad_worker(rank, self, trainer_cls, dataset_cls, data_handle_cls):
+    self.args['gpu'] = self.args['gpus'][rank]
+    self.args['verbose'] = rank == MASTER_RANK
     world_size = self.args['world_size']
     if not world_size:
         world_size = self.args['num_gpus'] * self.args['num_nodes']
-    world_rank = self.args['node_rank'] * self.args['num_gpus'] + gpu
+    world_rank = self.args['node_rank'] * self.args['num_gpus'] + rank
 
     self.args['is_master'] = world_rank == MASTER_RANK
     _dist.init_process_group(backend=self.args['dist_backend'],
@@ -142,14 +142,17 @@ class DADTorch:
 
     def _device_check(self):
         self.args['gpus'] = self.args['gpus'] if self.args.get('gpus') else []
-        if self.args['verbose'] and len(self.args['gpus']) > NUM_GPUS:
+        if len(self.args['gpus']) > NUM_GPUS:
+            self.args['gpus'] = list(range(NUM_GPUS))
             warn(f"{len(self.args['gpus'])} GPU(s) requested "
                  f"but {NUM_GPUS if CUDA_AVAILABLE else 'GPU(s) not'} detected. "
-                 f"Using {str(NUM_GPUS) + ' GPU(s)' if CUDA_AVAILABLE else 'CPU(Much slower)'}.")
-            self.args['gpus'] = list(range(NUM_GPUS))
+                 f"Using {str(NUM_GPUS) + ' GPU(s)' if CUDA_AVAILABLE else 'CPU(Much slower)'}.", self.args['verbose'])
+
+        if self.args.get('world_size') is not None:
+            self.args['gpus'] = [None] * self.args.get('world_size')
 
     def _ddp_setup(self):
-        if all([self.args['use_ddp'], NUM_GPUS >= 1, len(self.args['gpus']) >= 1]):
+        if all([self.args['use_ddp'], len(self.args['gpus']) >= 1]):
             self.args['num_gpus'] = len(self.args['gpus'])
             _os.environ['MASTER_ADDR'] = self.args.get('master_addr', '127.0.0.1')  #
             _os.environ['MASTER_PORT'] = self.args.get('master_port', '12355')

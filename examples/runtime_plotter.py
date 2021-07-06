@@ -6,40 +6,45 @@ import numpy as np
 import pandas as pd
 import sys
 import os
+import glob
 
-p1 = '../net_logs/experiment/experiment_log.json'
-p2 = '../net_logs_DDP/experiment/experiment_log.json'
-p3 = '../net_logs_DAD/experiment/experiment_log.json'
+import argparse
 
-paths = [p1, p2, p3]
-if len(sys.argv) > 1:
-    paths = sys.argv[1:]
+ap = argparse.ArgumentParser()
+ap.add_argument('-paths', '--paths', nargs='*', type=str, help='Root path to Logs.')
+ap.add_argument('-keys', '--keys', nargs='*', type=str, default=[], help='Keys to plot.')
+args = vars(ap.parse_args())
+
+
+def get_log(pth):
+    _exp_pth = pth + os.sep + os.listdir(pth)[0]
+    _jsn_pth = glob.glob(f'{_exp_pth}{os.sep}*_log.json')[0]
+    return json.load(open(_jsn_pth))
+
+
+keys = args['keys']
+if len(keys) == 0:
+    _keys = [k for k in get_log(args['paths'][0]).keys() if '_duration' in k]
+    keys = [k for k in _keys if not k.startswith('l')]  # SKIP Layer
+header = [p.split(os.sep)[-1].split('_')[-1] for p in args['paths']]
 
 skip = 5
-data = []
-data_cumu = []
-for p in paths:
-    if not p.endswith('.json'):
-        p = p + os.sep + 'experiment' + os.sep + 'experiment_log.json'
-        
-    j = json.load(open(p))
-    data.append(j['batch_run_time'][skip:])
-    data_cumu.append(np.cumsum(j['batch_run_time'][skip:]))
-data = np.array(data).T
-data_cumu = np.array(data_cumu).T
+for k in keys:
+    print(f"Working on key {k}...")
+    data_cumu = []
+    for p in args['paths']:
+        try:
+            data_cumu.append(np.cumsum(get_log(p)[k][skip:]))
+        except Exception as e:
+            print(f" ***** Error loading path {p} : {e} ***** ")
 
-colors = ['green', 'magenta', 'red']
-header = ['Single process', 'DDP', 'DAD']
-df = pd.DataFrame(data=data, columns=header)[skip:]
-df.plot(color=colors)
-plt.ylabel('Millis')
-plt.xlabel('Iteration')
-plt.savefig('runtime-compare.png')
-plt.close('all')
-
-df = pd.DataFrame(data=data_cumu, columns=header)[skip:]
-df.plot(color=colors)
-plt.ylabel('Cumulative Millis')
-plt.xlabel('Iteration')
-plt.savefig('runtime-compare_cumulative.png')
-plt.close('all')
+    try:
+        data_cumu = np.array(data_cumu).T
+        df = pd.DataFrame(data=data_cumu, columns=header)[skip:]
+        df.plot()
+        plt.ylabel('Cumulative Millis')
+        plt.xlabel('Iteration')
+        plt.savefig(f'{k}_cumulative.png')
+        plt.close('all')
+    except Exception as e:
+        print(f'***** Key: {k}| Error in data: {e} *****')
