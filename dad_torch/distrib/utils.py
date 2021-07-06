@@ -1,5 +1,6 @@
 import torch as _torch
 from torch import distributed as _dist
+from dad_torch.power_iteration_BC import power_iteration_BC
 
 
 class DADParallel(_torch.nn.Module):
@@ -106,14 +107,57 @@ class DADParallel(_torch.nn.Module):
 
         return act_gathered, grad_gathered
 
+    def _rankdad_reduce(self, act_tensor, grad_tensor, *args, **kw):
+        """This function plays the role of remote"""
+        act_gathered = [_torch.zeros_like(act_tensor) for _ in range(_dist.get_world_size())]
+        grad_gathered = [_torch.zeros_like(grad_tensor) for _ in range(_dist.get_world_size())]
+
+        _dist.all_gather(act_gathered, act_tensor)
+        _dist.all_gather(grad_gathered, grad_tensor)
+
+        act_gathered = _torch.cat(act_gathered)
+        grad_gathered = _torch.cat(grad_gathered)
+
+        return act_gathered, grad_gathered
+
     def dad_backward(self, reduce_in_rank=0):
         dad_params = dict([(k, v) for k, v in self.module.named_parameters()])
         dad_children = dict([(k, v) for k, v in self.module.named_children()])
 
         for layer in list(dad_children.keys())[::-1]:
+            print(("SHAPE", str(self._local_grads[layer].shape), str(self._activations[layer].shape)), self._local_grads[layer].device, self._activations[layer].device)
             act_tall, local_grad_tall = self._dad_reduce(self._activations[layer], self._local_grads[layer],
                                                          dest=reduce_in_rank)
+            print("PRE-REDUCE", act_tall.shape, local_grad_tall.shape)                                                         
             dad_params[f"{layer}.weight"].grad.data = (act_tall.T.mm(local_grad_tall)).T
 
             if dad_params.get(f"{layer}.bias") is not None:
                 dad_params[f"{layer}.bias"].grad.data = local_grad_tall.sum(0)
+
+    def rankdad_backward(self, reduce_in_rank=0):
+        reduction_rank=4
+        numiterations=1
+        #_pp.pprint("IN RANKDAD BACKWARD :)")
+        dad_params = dict([(k, v) for k, v in self.module.named_parameters()])
+        dad_children = dict([(k, v) for k, v in self.module.named_children()])
+
+        for layer in list(dad_children.keys())[::-1]:
+            #print(("SHAPE", str(self._local_grads[layer].shape), str(self._activations[layer].shape)), self._local_grads[layer].device, self._activations[layer].device)
+            delta_local_reduced, act_local_reduced = power_iteration_BC(self._local_grads[layer].t(), self._activations[layer].t(), rank=reduction_rank, numiterations=numiterations, device=self._local_grads[layer].device)
+            act_local_reduced = act_local_reduced.t()
+            delta_local_reduced = delta_local_reduced.t()
+            #print("SHAPE-POST", act_local_reduced.shape, delta_local_reduced.shape, act_local_reduced.device, delta_local_reduced.device)
+            act_tall, local_grad_tall = self._dad_reduce(act_local_reduced, delta_local_reduced,
+                                                         dest=reduce_in_rank)
+            #print("PRE-REDUCE", act_tall.shape, local_grad_tall.shape)
+            #print(act_tall.shape)
+            local_grad_tall, act_tall = power_iteration_BC(local_grad_tall.t(), act_tall.t(), rank=reduction_rank, numiterations=numiterations, device=act_tall.device)   
+            act_tall = act_tall.t()
+            local_grad_tall = local_grad_tall.t()                                                      
+            #print("POST-REDUCE", act_tall.shape, local_grad_tall.shape)
+            dad_params[f"{layer}.weight"].grad.data = (act_tall.T.mm(local_grad_tall)).T
+
+            if dad_params.get(f"{layer}.bias") is not None:
+                dad_params[f"{layer}.bias"].grad.data = local_grad_tall.sum(0)        
+
+    

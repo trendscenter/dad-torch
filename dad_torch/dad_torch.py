@@ -136,6 +136,7 @@ class DADTorch:
 
         self._device_check()
         self._ddp_setup()
+        _pp.pprint("ARGS" + str(self.args))
         self._make_reproducible()
         self.args.update(is_master=self.args.get('is_master', True))
 
@@ -155,6 +156,7 @@ class DADTorch:
         else:
             self.args['use_ddp'] = False
             self.args['dad_reduction'] = False
+            self.args['rankdad_reduction'] = False
 
     def _show_args(self):
         info('Starting with the following parameters:', self.args['verbose'])

@@ -65,6 +65,7 @@ class NNTrainer:
         If path to pretrained weights are given, it will be used instead.
         """
         if self.args['pretrained_path'] is not None:
+            print("LOADING???")
             self.load_checkpoint(self.args['pretrained_path'],
                                  self.args.get('load_model_state', True),
                                  self.args.get('load_optimizer_state', True))
@@ -120,7 +121,7 @@ class NNTrainer:
         """
 
         if self.args.get('use_ddp'):
-            if self.args.get('dad_reduction'):
+            if self.args.get('dad_reduction') or self.args.get('rankdad_reduction'):
                 for model_key in self.nn:
                     self.nn[model_key] = self.nn[model_key].to(self.device['gpu'])
                 for model_key in self.nn:
@@ -380,6 +381,12 @@ class NNTrainer:
                 "Gradient accumulation not yet implemented for DAD algorithm."
             for mk in self.nn:
                 self.nn[mk].dad_backward(reduce_in_rank=MASTER_RANK)
+        
+        if self.args.get("rankdad_reduction"):
+            assert self.args.get('grad_accum_iters', 1) == 1, \
+                "Gradient accumulation not yet implemented for DAD algorithm."
+            for mk in self.nn:                
+                self.nn[mk].rankdad_backward(reduce_in_rank=MASTER_RANK)
 
         if i % self.args.get('grad_accum_iters', 1) == 0:
             for optim in self.optimizer:

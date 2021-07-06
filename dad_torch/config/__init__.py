@@ -71,6 +71,8 @@ if _args.get('use_ddp'):
                             help='Master node address.')
     default_ap.add_argument('--dad-reduction', default=False, type=boolean_string,
                             help='Will use DAD by master rank for reduction.')
+    default_ap.add_argument('--rankdad-reduction', default=False, type=boolean_string,
+                            help='Will use rank-DAD by master rank for reduction.')
 
 _known, _unknown = default_ap.parse_known_args()
 default_args = vars(_known)
