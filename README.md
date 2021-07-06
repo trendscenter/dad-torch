@@ -27,13 +27,13 @@ Use runtime_plotter.py in examples to compare different runtimes as below.
 
 * cd examples
 * python runtime_plotter.py -paths <List of paths to logs folder> -keys <list of keys to plot>
-  * Example: python runtime_plotter.py -paths nest_logs_DAD_BCs4b128  net_logs_DDPs4b128 -keys batch_duration
-   Passing nothing to -keys will plot everything duration of forward, backward, each layers ... (not recommended)
+  * Example: python runtime_plotter.py -paths nest_logs_DAD_BCs4b128  net_logs_DDPs4b128 -keys batch_duration.
+    * Passing nothing to -keys will plot everything duration of forward, backward, each layers ... (not recommended)
   * List of duration keys used are in training_iteration(self, i, batch) -> dict: method of training.py.
   * Example experiment schedule is in examples/jobs.py
 * Hint: To generate plot for experiment with 4 sites, and batch size 128 one can run
-  * python runtime_plotter.py -paths `ls -d *s4*b128*` -keys batch_duration
-* All experiments data are in /home/akhanal1/TrendsLab/dad-torch/examples for referenceThere will be error if 
+  * python runtime_plotter.py -paths \`ls -d *s4*b128*\` -keys batch_duration.
+* All experiments data are in /home/akhanal1/TrendsLab/dad-torch/examples for reference. 
 
 **Plotter will throw an exception when a key is not available in all provided paths. For example, we cannot plot key dad_backward_duration for list of experiments with DDP(standard SGD) because it will not have that key, only DAD experiment will have it. So it only makes sense to only plot batch_duration for such case.**
    
