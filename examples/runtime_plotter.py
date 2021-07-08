@@ -3,10 +3,11 @@
 import json
 import matplotlib.pyplot as plt
 import numpy as np
-import pandas as pd
-import sys
 import os
 import glob
+import seaborn as sns
+
+sns.set_style("darkgrid")
 
 import argparse
 
@@ -31,20 +32,13 @@ header = [p.split(os.sep)[-1].split('_')[-1] for p in args['paths']]
 skip = 5
 for k in keys:
     print(f"Working on key {k}...")
-    data_cumu = []
     for p in args['paths']:
-        try:
-            data_cumu.append(np.cumsum(get_log(p)[k][skip:]))
-        except Exception as e:
-            print(f" ***** Error loading path {p} : {e} ***** ")
+        _data = np.cumsum(get_log(p)[k][skip:])
+        sns.lineplot(x=range(len(_data)), y=_data)
 
-    try:
-        data_cumu = np.array(data_cumu).T
-        df = pd.DataFrame(data=data_cumu, columns=header)[skip:]
-        df.plot()
-        plt.ylabel('Cumulative Millis')
-        plt.xlabel('Iteration')
-        plt.savefig(f'{k}_cumulative.png')
-        plt.close('all')
-    except Exception as e:
-        print(f'***** Key: {k}| Error in data: {e} *****')
+    plt.yscale("log")
+    plt.ylabel("Cumulative Runtime (log)")
+    plt.xlabel("Batch Iteration")
+    plt.legend(header)
+    plt.savefig(f'{k}_cumulative.png', bbox_inches="tight")
+    print('Done.')

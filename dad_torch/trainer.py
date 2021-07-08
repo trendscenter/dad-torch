@@ -65,6 +65,7 @@ class NNTrainer:
         If path to pretrained weights are given, it will be used instead.
         """
         if self.args['pretrained_path'] is not None:
+            print("LOADING???")
             self.load_checkpoint(self.args['pretrained_path'],
                                  self.args.get('load_model_state', True),
                                  self.args.get('load_optimizer_state', True))
@@ -124,8 +125,13 @@ class NNTrainer:
                 for model_key in self.nn:
                     self.nn[model_key] = self.nn[model_key].to(self.device['gpu'])
                 for model_key in self.nn:
-                    self.nn[model_key] = DADParallel(module=self.nn[model_key], device=self.device['gpu'],
-                                                     args=self.args, cache=self.cache)
+                    self.nn[model_key] = DADParallel(module=self.nn[model_key],
+                                                     device=self.device['gpu'],
+                                                     reduction_method=self.args['dad_reduction'],
+                                                     reduction_rank=self.args['dad_reduction_rank'],
+                                                     num_pow_iters=self.args['dad_pow_iters'],
+                                                     commn_mode=self.args['dad_commn_mode'],
+                                                     cache=self.cache)
             else:
                 for model_key in self.nn:
                     self.nn[model_key] = self.nn[model_key].to(self.device['gpu'])
@@ -377,29 +383,24 @@ class NNTrainer:
         Learning step for one batch.
         We decoupled it so that user could implement any complex/multi/alternate training strategies.
         """
-        total_duration = datetime.timedelta(0)
 
-        _start = time.time()
         it = self.iteration(batch)
-        total_duration = total_duration + duration(self.cache, _start, 'forward_duration')
 
         _start = time.time()
+        """------------------------------------------------------------------"""
         it['loss'].backward()
-        bk_del = duration(self.cache, _start, 'backward_duration')
-
-        if not self.args.get('dad_reduction') or not self.args.get('ignore_backwards', True):
-            total_duration = total_duration + bk_del
 
         if self.args.get('dad_reduction'):
             assert self.args.get('grad_accum_iters', 1) == 1, \
                 "Gradient accumulation not yet implemented for DAD algorithm."
 
-            _start = time.time()
+            if self.args.get('ignore_backward'):
+                _start = time.time()
+
             for mk in self.nn:
                 self.nn[mk].dad_backward(reduce_in_rank=MASTER_RANK)
-            total_duration = total_duration + duration(self.cache, _start, 'dad_backward_duration')
-
-        duration(self.cache, None, 'batch_duration', t_del=total_duration)
+        """--------------------------------------------------------------------"""
+        duration(self.cache, _start, key='batch_duration')
 
         if i % self.args.get('grad_accum_iters', 1) == 0:
             for optim in self.optimizer:

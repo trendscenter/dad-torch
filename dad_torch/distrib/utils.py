@@ -1,18 +1,22 @@
 import torch as _torch
 from torch import distributed as _dist
+from dad_torch.power_iteration_BC import power_iteration_BC
 
 _GATHER_BROADCAST_BACKENDS = ['mpi', 'gloo']
 _ALL_GATHER_BACKENDS = ['nccl']
 
 
 class DADParallel(_torch.nn.Module):
-    def __init__(self, module, device=None, **kw):
+    def __init__(self, module, device=None, reduction_method='dad', reduction_rank=5, num_pow_iters=1, **kw):
         assert _dist.is_initialized(), "*** Default process group is not initialized. ***"
         super(DADParallel, self).__init__()
         self.module = module
         self.device = device
-        self.args = kw.get('args', {})
         self.cache = kw.get('cache', {})
+        self.reduction_method = reduction_method  # dad/rankdad
+        self.reduction_rank = reduction_rank
+        self.num_pow_iters = num_pow_iters
+        self.commn_mode = kw.get('commn_mode', 'all_gather')
         self._reset()
 
     def _reset(self):
@@ -103,22 +107,78 @@ class DADParallel(_torch.nn.Module):
         return act_gathered, grad_gathered
 
     def dad_backward(self, reduce_in_rank=0):
+        if self.reduction_method == 'dad':
+            self._dad_backward(reduce_in_rank)
+        elif self.reduction_method == 'rankdad':
+            self._rankdad_backward(reduce_in_rank)
+        else:
+            raise NotImplementedError(f'Not implemented for {self.reduction}. Please use one of dad, rankdad.')
+
+    def _dad_backward(self, reduce_in_rank=0):
         dad_params = dict([(k, v) for k, v in self.module.named_parameters()])
         dad_children = dict([(k, v) for k, v in self.module.named_children()])
 
         for layer in list(dad_children.keys())[::-1]:
             act_tall, local_grad_tall = [_torch.ones(1)] * 2
 
-            if self.args.get('comm_mode', 'ag').lower() == 'ag':
-                act_tall, local_grad_tall = self._dad_reduce_all_gather(self._activations[layer],
-                                                                        self._local_grads[layer],
-                                                                        dest=reduce_in_rank)
-            elif self.args['comm_mode'].lower() == 'bc':
-                act_tall, local_grad_tall = self._dad_reduce_gather_broadcast(self._activations[layer],
-                                                                              self._local_grads[layer],
-                                                                              dest=reduce_in_rank)
+            if self.commn_mode == 'all_gather':
+                act_tall, local_grad_tall = self._dad_reduce_all_gather(
+                    self._activations[layer],
+                    self._local_grads[layer],
+                    dest=reduce_in_rank
+                )
+            elif self.commn_mode == 'gather_broadcast':
+                act_tall, local_grad_tall = self._dad_reduce_gather_broadcast(
+                    self._activations[layer],
+                    self._local_grads[layer],
+                    dest=reduce_in_rank
+                )
 
             """Update weights"""
+            dad_params[f"{layer}.weight"].grad.data = (act_tall.T.mm(local_grad_tall)).T
+            if dad_params.get(f"{layer}.bias") is not None:
+                dad_params[f"{layer}.bias"].grad.data = local_grad_tall.sum(0)
+
+    def _rankdad_backward(self, reduce_in_rank=0):
+        dad_params = dict([(k, v) for k, v in self.module.named_parameters()])
+        dad_children = dict([(k, v) for k, v in self.module.named_children()])
+
+        for layer in list(dad_children.keys())[::-1]:
+            act_tall, local_grad_tall = [_torch.ones(1)] * 2
+
+            if _dist.get_rank() == 0:
+                print(self.reduction_rank, self.num_pow_iters, self.commn_mode)
+                print(f'{layer} ORIG-SHAPE: ', self._activations[layer].T.shape, self._local_grads[layer].T.shape)
+
+            delta_local_reduced, act_local_reduced = power_iteration_BC(
+                self._local_grads[layer].T.clone().detach(),
+                self._activations[layer].T.clone().detach(),
+                rank=self.reduction_rank,
+                numiterations=self.num_pow_iters,
+                device=self._local_grads[layer].device
+            )
+
+            if _dist.get_rank() == 0:
+                print(f'{layer} RANK-REDUCED-SHAPE: ', act_local_reduced.T.shape, delta_local_reduced.T.shape)
+
+            if self.commn_mode == 'all_gather':
+                act_tall, local_grad_tall = self._dad_reduce_all_gather(
+                    act_local_reduced.T,
+                    delta_local_reduced.T,
+                    dest=reduce_in_rank
+                )
+
+            elif self.commn_mode == 'gather_broadcast':
+                act_tall, local_grad_tall = self._dad_reduce_gather_broadcast(
+                    act_local_reduced.T,
+                    delta_local_reduced.T,
+                    dest=reduce_in_rank
+                )
+
+            if _dist.get_rank() == 0:
+                print(f'{layer} CONCATENATED-SHAPE: ', act_tall.shape, local_grad_tall.shape)
+                print('----------------------------------------------------------------------------')
+
             dad_params[f"{layer}.weight"].grad.data = (act_tall.T.mm(local_grad_tall)).T
             if dad_params.get(f"{layer}.bias") is not None:
                 dad_params[f"{layer}.bias"].grad.data = local_grad_tall.sum(0)

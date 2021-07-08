@@ -8,8 +8,7 @@ from dad_torch.config import boolean_string
 import argparse
 
 ap = argparse.ArgumentParser(parents=[default_ap], add_help=False)
-ap.add_argument('--ignore-backward', default=True, type=boolean_string, help='Ignore .backward in runtime record.')
-ap.add_argument('--comm-mode', default='ag', type=str, help='gather broadcast(BC) or all_gather(AG)')
+ap.add_argument('--ignore-backward', default=False, type=boolean_string, help='Ignore .backward in runtime record.')
 
 transform = transforms.Compose([
     transforms.ToTensor(),
@@ -77,7 +76,7 @@ val_dataset.data = val_dataset.data[:iter].clone()
 val_dataset.target = val_dataset.targets[:iter].clone()
 
 dataloader_args = {'train': {'dataset': train_dataset},
-                   'validation': {'dataset': val_dataset}}
+                   'test': {'dataset': val_dataset}}
 
 if __name__ == "__main__":
     runner = DADTorch(dataloader_args=dataloader_args, args=ap, seed=111, seed_all=True, force=True)

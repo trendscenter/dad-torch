@@ -69,8 +69,15 @@ if _args.get('use_ddp'):
                             help='Master node address.')
     default_ap.add_argument('--master-port', default='8998', type=str,
                             help='Master node address.')
-    default_ap.add_argument('--dad-reduction', default=False, type=boolean_string,
-                            help='Will use DAD by master rank for reduction.')
+
+    default_ap.add_argument('--dad-reduction', default=None, type=str,
+                            help='Will use DAD by master rank for reduction.options: (dad/rankdad)')
+    default_ap.add_argument('--dad-reduction-rank', default=5, type=int,
+                            help='Rank of reduced matrices.')
+    default_ap.add_argument('--dad-pow-iters', default=1, type=int,
+                            help='Num of pow iterations.')
+    default_ap.add_argument('--dad-commn-mode', default='all_gather', type=str,
+                            help='collective communication mode.')
 
 _known, _unknown = default_ap.parse_known_args()
 default_args = vars(_known)

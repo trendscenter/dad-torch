@@ -12,12 +12,16 @@ import dad_torch.distrib.utils as utils
 model = utils.DADParallel(...) # See trainer.py for the exact usage.
 ```
 #### Run example/MNIST_dadtorch.py as:
-1. git clone this repo.
-2. RUN cd dad-torch
-3. RUN chmod u+x deploy.sh
-4. RUN ./deploy.sh
-5. RUN cd examples
-6. RUN python MNIST_dadtorch.py -ph train -ddp True --dad-reduction True -seed 1 -seed-all True -log net_logs_DADs2b64
+* git clone this repo.
+* RUN cd dad-torch
+* RUN chmod u+x deploy.sh
+* RUN ./deploy.sh
+* RUN cd examples
+* RUN python MNIST_dadtorch.py -ph train -b 64 -ddp True --dad-reduction dad -e 30 --dist-backend nccl -logs net_logs_DAD64
+  * --dad-reduction: None, dad, rankdad
+  * --dad-reduction-rank 5
+  * --dad-pow-iters 1
+  * --dad-commn-mode all_gather/gather_broadcast
 
 #### Development ####
 Any changes made in the code can be deployed as ./deploy.sh

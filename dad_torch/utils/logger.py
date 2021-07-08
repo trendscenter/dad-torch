@@ -26,11 +26,13 @@ def lazy_debug(x, add=0):
     return x % (_scale + 1) == 0
 
 
-def duration(cache: dict, begin, key, t_del=None):
+def duration(cache: dict, begin, key=None, t_del=None):
     if t_del is None:
         t_del = datetime.datetime.fromtimestamp(time.time()) - datetime.datetime.fromtimestamp(begin)
-    if cache.get(key) is None:
-        cache[key] = [t_del.total_seconds() * 1000]  # Millis
-    else:
-        cache[key].append(t_del.total_seconds() * 1000)  # Millis
+
+    if key is not None:
+        if cache.get(key) is None:
+            cache[key] = [t_del.total_seconds() * 1000]  # Millis
+        else:
+            cache[key].append(t_del.total_seconds() * 1000)  # Millis
     return t_del
