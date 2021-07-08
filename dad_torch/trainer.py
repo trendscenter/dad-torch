@@ -383,24 +383,30 @@ class NNTrainer:
         Learning step for one batch.
         We decoupled it so that user could implement any complex/multi/alternate training strategies.
         """
-
-        it = self.iteration(batch)
+        tot = datetime.timedelta(0)
 
         _start = time.time()
-        """------------------------------------------------------------------"""
+        it = self.iteration(batch)
+        tot = tot + duration(self.cache, _start, key=None)
+
+        _start = time.time()
         it['loss'].backward()
+        bk_del = duration(self.cache, _start, key=None)
+        tot = tot + bk_del
 
         if self.args.get('dad_reduction'):
             assert self.args.get('grad_accum_iters', 1) == 1, \
                 "Gradient accumulation not yet implemented for DAD algorithm."
 
             if self.args.get('ignore_backward'):
-                _start = time.time()
+                tot = tot - bk_del
 
+            _start = time.time()
             for mk in self.nn:
                 self.nn[mk].dad_backward(reduce_in_rank=MASTER_RANK)
-        """--------------------------------------------------------------------"""
-        duration(self.cache, _start, key='batch_duration')
+            tot = tot + duration(self.cache, _start, key=None)
+
+        duration(self.cache, None, key='batch_duration', t_del=tot)
 
         if i % self.args.get('grad_accum_iters', 1) == 0:
             for optim in self.optimizer:
