@@ -135,7 +135,7 @@ class DADParallel(_torch.nn.Module):
                 )
 
             """Update weights"""
-            dad_params[f"{layer}.weight"].grad.data = (act_tall.T.mm(local_grad_tall)).T
+            dad_params[f"{layer}.weight"].grad.data = (act_tall.T.mm(local_grad_tall)).T.contiguous()
             if dad_params.get(f"{layer}.bias") is not None:
                 dad_params[f"{layer}.bias"].grad.data = local_grad_tall.sum(0)
 
@@ -151,8 +151,8 @@ class DADParallel(_torch.nn.Module):
                 print(f'{layer} ORIG-SHAPE: ', self._activations[layer].T.shape, self._local_grads[layer].T.shape)
 
             delta_local_reduced, act_local_reduced = power_iteration_BC(
-                self._local_grads[layer].T.clone().detach(),
-                self._activations[layer].T.clone().detach(),
+                self._local_grads[layer].T.contiguous(),
+                self._activations[layer].T.contiguous(),
                 rank=self.reduction_rank,
                 numiterations=self.num_pow_iters,
                 device=self._local_grads[layer].device
@@ -163,15 +163,15 @@ class DADParallel(_torch.nn.Module):
 
             if self.commn_mode == 'all_gather':
                 act_tall, local_grad_tall = self._dad_reduce_all_gather(
-                    act_local_reduced.T,
-                    delta_local_reduced.T,
+                    act_local_reduced.T.contiguous(),
+                    delta_local_reduced.T.contiguous(),
                     dest=reduce_in_rank
                 )
 
             elif self.commn_mode == 'gather_broadcast':
                 act_tall, local_grad_tall = self._dad_reduce_gather_broadcast(
-                    act_local_reduced.T,
-                    delta_local_reduced.T,
+                    act_local_reduced.T.contiguous(),
+                    delta_local_reduced.T.contiguous(),
                     dest=reduce_in_rank
                 )
 
@@ -179,6 +179,6 @@ class DADParallel(_torch.nn.Module):
                 print(f'{layer} CONCATENATED-SHAPE: ', act_tall.shape, local_grad_tall.shape)
                 print('----------------------------------------------------------------------------')
 
-            dad_params[f"{layer}.weight"].grad.data = (act_tall.T.mm(local_grad_tall)).T
+            dad_params[f"{layer}.weight"].grad.data = (act_tall.T.mm(local_grad_tall)).T.contiguous()
             if dad_params.get(f"{layer}.bias") is not None:
                 dad_params[f"{layer}.bias"].grad.data = local_grad_tall.sum(0)
