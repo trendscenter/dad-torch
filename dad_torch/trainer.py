@@ -406,12 +406,14 @@ class NNTrainer:
                 self.nn[mk].dad_backward(reduce_in_rank=MASTER_RANK)
             tot = tot + duration(self.cache, _start, key=None)
 
-        duration(self.cache, None, key='batch_duration', t_del=tot)
-
         if i % self.args.get('grad_accum_iters', 1) == 0:
+            _start = time.time()
             for optim in self.optimizer:
                 self.optimizer[optim].step()
                 self.optimizer[optim].zero_grad()
+            tot = tot + duration(self.cache, _start, key=None)
+
+        duration(self.cache, None, key='batch_duration', t_del=tot)
         return it
 
     def reduce_scores(self, accumulator: list, distributed=False) -> dict:
