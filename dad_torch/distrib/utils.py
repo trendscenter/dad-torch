@@ -151,12 +151,12 @@ class DADParallel(_torch.nn.Module):
             delta_local_reduced = delta_local_reduced.t()
             #print("SHAPE-POST", act_local_reduced.shape, delta_local_reduced.shape, act_local_reduced.device, delta_local_reduced.device)
             if self.args.get('comm_mode', 'ag').lower() == 'ag':
-                act_tall, local_grad_tall = self._dad_reduce_all_gather(self._activations[layer],
-                                                                        self._local_grads[layer],
+                act_tall, local_grad_tall = self._dad_reduce_all_gather(act_local_reduced,
+                                                                        delta_local_reduced,
                                                                         dest=reduce_in_rank)
             elif self.args['comm_mode'].lower() == 'bc':
-                act_tall, local_grad_tall = self._dad_reduce_gather_broadcast(self._activations[layer],
-                                                                              self._local_grads[layer],
+                act_tall, local_grad_tall = self._dad_reduce_gather_broadcast(act_local_reduced,
+                                                                              delta_local_reduced,
                                                                               dest=reduce_in_rank)
 
             #print("PRE-REDUCE", act_tall.shape, local_grad_tall.shape)
