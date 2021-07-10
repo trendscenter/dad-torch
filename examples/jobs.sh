@@ -17,8 +17,8 @@
 #    done
 #done
 
-BATCH_SIZE=256
-python MNIST_dadtorch.py -ddp True -ph train -nw 4 --dist-backend nccl -b $BATCH_SIZE -log net_logs_dSGD
-python MNIST_dadtorch.py -ddp True -ph train -nw 4 --dist-backend nccl -b $BATCH_SIZE -log net_logs_DAD --dad-reduction dad
-python MNIST_dadtorch.py -ddp True -ph train -nw 4 --dist-backend nccl -b $BATCH_SIZE -log net_logs_DAD-IB --dad-reduction dad --ignore-backward True
-python runtime_plotter.py -paths net_logs_dSGD net_logs_DAD net_logs_DAD-IB -keys batch_duration
+BATCH_SIZE=16
+python3 MNIST_dadtorch.py -ddp True -ph train -nw 4 --dist-backend nccl -b $BATCH_SIZE -log net_logs_dSGD --dad-reduction base #--dist-backend gloo --world-size 4
+python3 MNIST_dadtorch.py -ddp True -ph train -nw 4 --dist-backend nccl -b $BATCH_SIZE -log net_logs_DAD --dad-reduction dad #--dist-backend gloo --world-size 4
+python3 MNIST_dadtorch.py -ddp True -ph train -nw 4 --dist-backend nccl -b $BATCH_SIZE -log net_logs_DAD-IB --dad-reduction dad --ignore-backward True #--dist-backend gloo --world-size 4
+python3 runtime_plotter.py -paths net_logs_dSGD net_logs_DAD net_logs_DAD-IB -keys batch_duration

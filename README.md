@@ -18,7 +18,7 @@ model = utils.DADParallel(...) # See trainer.py for the exact usage.
 * RUN ./deploy.sh
 * RUN cd examples
 * RUN python MNIST_dadtorch.py -ph train -b 64 -ddp True --dad-reduction dad -e 30 --dist-backend nccl -logs net_logs_DAD64
-  * --dad-reduction: None, dad, rankdad
+  * --dad-reduction: None, base, dad, rankdad
   * --dad-reduction-rank 5
   * --dad-pow-iters 1
   * --dad-commn-mode all_gather/gather_broadcast
