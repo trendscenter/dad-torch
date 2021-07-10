@@ -72,13 +72,6 @@ class DADParallel(_torch.nn.Module):
         output = self.module(*inputs, **kwargs)
         return output
 
-    def _base_backward(self, *args, **kwargs):
-        size = _dist.get_world_size()
-        for param in self.module.parameters():
-            grad_gathered = [_torch.zeros_like(param.grad.data) for _ in range(size)]
-            _dist.all_gather(grad_gathered, param.grad.data)
-            param.grad.data = _torch.stack(grad_gathered).sum(0) / float(size)
-
     """gather is not implemented in nccl backend"""
 
     def _dad_reduce_gather_broadcast(self, act_tensor, grad_tensor, dest=0, *args, **kw):
@@ -122,6 +115,13 @@ class DADParallel(_torch.nn.Module):
             self._rankdad_backward(reduce_in_rank)
         else:
             raise NotImplementedError(f'Not implemented for {self.reduction}. Please use one of dad, rankdad.')
+
+    def _base_backward(self, *args, **kwargs):
+        size = _dist.get_world_size()
+        for param in self.module.parameters():
+            grad_gathered = [_torch.zeros_like(param.grad.data) for _ in range(size)]
+            _dist.all_gather(grad_gathered, param.grad.data)
+            param.grad.data = _torch.stack(grad_gathered).sum(0) / float(size)
 
     def _dad_backward(self, reduce_in_rank=0):
         dad_params = dict([(k, v) for k, v in self.module.named_parameters()])
