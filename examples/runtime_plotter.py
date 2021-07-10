@@ -7,6 +7,8 @@ import os
 import glob
 import seaborn as sns
 
+plt.rcParams["figure.figsize"] = (20, 9)
+
 sns.set_style("darkgrid")
 
 import argparse
@@ -14,6 +16,7 @@ import argparse
 ap = argparse.ArgumentParser()
 ap.add_argument('-paths', '--paths', nargs='*', type=str, help='Root path to Logs.')
 ap.add_argument('-keys', '--keys', nargs='*', type=str, default=[], help='Keys to plot.')
+ap.add_argument('-name', '--name', type=str, default='', help='Name of plot.')
 args = vars(ap.parse_args())
 
 
@@ -31,14 +34,21 @@ header = [p.split(os.sep)[-1].split('_')[-1] for p in args['paths']]
 
 skip = 5
 for k in keys:
+
     print(f"Working on key {k}...")
+
+    fig, axs = plt.subplots(1, 2)
     for p in args['paths']:
         _data = np.cumsum(get_log(p)[k][skip:])
-        sns.lineplot(x=range(len(_data)), y=_data)
+        sns.lineplot(x=range(len(_data)), y=_data, ax=axs[0])
+        sns.lineplot(x=range(len(_data)), y=_data, ax=axs[1])
 
-    plt.yscale("log")
-    plt.ylabel("Cumulative Runtime (log)")
-    plt.xlabel("Batch Iteration")
+    axs[1].set_yscale("log")
+    axs[0].set_ylabel("Cumulative Runtime")
+    for ax in axs:
+        ax.set_xlabel("Batch Iteration")
+
     plt.legend(header)
-    plt.savefig(f'{k}_cumulative.png', bbox_inches="tight")
+    plt.savefig(f"{k}_cumulative{args['name']}.png", bbox_inches="tight")
+    plt.close('all')
     print('Done.')
