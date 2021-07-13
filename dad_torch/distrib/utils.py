@@ -9,11 +9,12 @@ _ALL_GATHER_BACKENDS = ['nccl']
 class DADParallel(_torch.nn.Module):
     def __init__(self, module, device=None, reduction_method='dad', reduction_rank=5, num_pow_iters=1, **kw):
         assert _dist.is_initialized(), "*** Default process group is not initialized. ***"
+
         super(DADParallel, self).__init__()
         self.module = module
         self.device = device
         self.cache = kw.get('cache', {})
-        self.reduction_method = reduction_method  # dad/rankdad
+        self.reduction_method = reduction_method
         self.reduction_rank = reduction_rank
         self.num_pow_iters = num_pow_iters
         self.commn_mode = kw.get('commn_mode', 'all_gather')
@@ -114,7 +115,8 @@ class DADParallel(_torch.nn.Module):
         elif self.reduction_method == 'rankdad':
             self._rankdad_backward(reduce_in_rank)
         else:
-            raise NotImplementedError(f'Not implemented for {self.reduction}. Please use one of dad, rankdad.')
+            raise NotImplementedError(
+                f'Not implemented for {self.reduction_method}. Please use one of None, base, dad, OR rankdad.')
 
     def _base_backward(self, *args, **kwargs):
         size = _dist.get_world_size()
@@ -156,38 +158,27 @@ class DADParallel(_torch.nn.Module):
         for layer in list(dad_children.keys())[::-1]:
             act_tall, local_grad_tall = [_torch.ones(1)] * 2
 
-            if _dist.get_rank() == 0:
-                print(self.reduction_rank, self.num_pow_iters, self.commn_mode)
-                print(f'{layer} ORIG-SHAPE: ', self._activations[layer].T.shape, self._local_grads[layer].T.shape)
-
             delta_local_reduced, act_local_reduced = power_iteration_BC(
-                self._local_grads[layer].T.contiguous(),
-                self._activations[layer].T.contiguous(),
+                self._local_grads[layer].T,
+                self._activations[layer].T,
                 rank=self.reduction_rank,
                 numiterations=self.num_pow_iters,
                 device=self._local_grads[layer].device
             )
 
-            if _dist.get_rank() == 0:
-                print(f'{layer} RANK-REDUCED-SHAPE: ', act_local_reduced.T.shape, delta_local_reduced.T.shape)
-
             if self.commn_mode == 'all_gather':
                 act_tall, local_grad_tall = self._dad_reduce_all_gather(
-                    act_local_reduced.T.contiguous(),
-                    delta_local_reduced.T.contiguous(),
+                    act_local_reduced.T,
+                    delta_local_reduced.T,
                     dest=reduce_in_rank
                 )
 
             elif self.commn_mode == 'gather_broadcast':
                 act_tall, local_grad_tall = self._dad_reduce_gather_broadcast(
-                    act_local_reduced.T.contiguous(),
-                    delta_local_reduced.T.contiguous(),
+                    act_local_reduced.T,
+                    delta_local_reduced.T,
                     dest=reduce_in_rank
                 )
-
-            if _dist.get_rank() == 0:
-                print(f'{layer} CONCATENATED-SHAPE: ', act_tall.shape, local_grad_tall.shape)
-                print('----------------------------------------------------------------------------')
 
             dad_params[f"{layer}.weight"].grad.data = (act_tall.T.mm(local_grad_tall)).T.contiguous()
             if dad_params.get(f"{layer}.bias") is not None:

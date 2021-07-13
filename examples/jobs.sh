@@ -6,6 +6,8 @@ PHASE="train"
 BACKEND="nccl"
 
 EPOCH=51
+
+#python MNIST_dadtorch.py -ddp True -ph train -nw 4 --dist-backend nccl -b 64 -log net_logs --dad-reduction dad
 for b in "${BATCH_SIZES[@]}"
 do
   python3 MNIST_dadtorch.py -ddp True -ph $PHASE -nw 4 -e $EPOCH --dist-backend nccl -b $b -log net_logs_dSGD"$b" --dad-reduction base

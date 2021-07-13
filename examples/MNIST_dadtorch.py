@@ -68,7 +68,7 @@ train_dataset = datasets.MNIST('data', train=True, download=True,
                                transform=transform)
 val_dataset = datasets.MNIST('data', train=False,
                              transform=transform)
-iter = 64 * 400
+iter = 64 * 1000
 train_dataset.data = train_dataset.data[:iter].clone()
 train_dataset.target = train_dataset.targets[:iter].clone()
 
@@ -79,5 +79,5 @@ dataloader_args = {'train': {'dataset': train_dataset},
                    'test': {'dataset': val_dataset}}
 
 if __name__ == "__main__":
-    runner = DADTorch(dataloader_args=dataloader_args, args=ap, seed=111, seed_all=True, force=True)
+    runner = DADTorch(dataloader_args=dataloader_args, args=ap, seed=3, seed_all=True, force=True)
     runner.run(MNISTTrainer)

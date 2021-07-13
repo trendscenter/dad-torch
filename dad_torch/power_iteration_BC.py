@@ -1,9 +1,7 @@
 import torch
 
 
-def power_iteration_BC(B, C, rank=10, numiterations=20, device='cuda', tol=1e-3):
-    print(B.shape, C.shape)
-
+def power_iteration_BC(B, C, rank=10, numiterations=20, device='cuda', tol=0.0):
     CC = torch.mm(C.T, C)
     BCC = torch.mm(B, CC)
 
@@ -12,16 +10,16 @@ def power_iteration_BC(B, C, rank=10, numiterations=20, device='cuda', tol=1e-3)
         b_k = torch.zeros(B.shape[0], device=device)
         c_k = torch.zeros(C.shape[0], device=device)
         return {"b": b_k, "c": c_k, "sigma": sigma, "v": b_k}
-        
+
     def eigenvalue(B, v):
         Bv = torch.mv(B.T, v)
         return torch.sqrt(Bv.dot(torch.mv(CC, Bv)))
 
-    def past_values(computed_eigs):        
+    def past_values(computed_eigs):
         bb = torch.stack([x['b'] for x in computed_eigs], 0)
         vv = torch.stack([x['v'] for x in computed_eigs], 0)
         return bb, vv
-    
+
     def iterations(computed_eigs=[], is_sigma=1):
         if not is_sigma: return zero_result()
         # start with one of the columns
@@ -36,10 +34,10 @@ def power_iteration_BC(B, C, rank=10, numiterations=20, device='cuda', tol=1e-3)
             # calculate the matrix-by-vector product (BC'CB' - adjusting_matrix)b
             b_k1 = torch.mv(BCC, torch.mv(B.T, b_k)) - adjuster
             # calculate the norm of b
-            b_k1_norm = torch.norm(b_k1)            
+            b_k1_norm = torch.norm(b_k1)
             # re normalize the vector
             b_k = b_k1 / b_k1_norm
-            
+
         sigma = eigenvalue(B, b_k)
         if torch.isnan(sigma): return zero_result()
         c_k = torch.mv(C, torch.mv(B.T, b_k))/sigma
