@@ -157,7 +157,7 @@ class DADTorch:
             _os.environ['MASTER_PORT'] = self.args.get('master_port', '12355')
         else:
             self.args['use_ddp'] = False
-            self.args['dad_reduction'] = None
+            self.args['dad_reduction'] = "None"
 
     def _show_args(self):
         info('Starting with the following parameters:', self.args['verbose'])

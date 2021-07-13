@@ -152,7 +152,7 @@ class DADParallel(_torch.nn.Module):
     def _rankdad_backward(self, reduce_in_rank=0):
         dad_params = dict([(k, v) for k, v in self.module.named_parameters()])
         dad_children = dict([(k, v) for k, v in self.module.named_children()])
-
+        print("THIS IS CORRECT")
         for layer in list(dad_children.keys())[::-1]:
             act_tall, local_grad_tall = [_torch.ones(1)] * 2
 
@@ -188,7 +188,23 @@ class DADParallel(_torch.nn.Module):
             if _dist.get_rank() == 0:
                 print(f'{layer} CONCATENATED-SHAPE: ', act_tall.shape, local_grad_tall.shape)
                 print('----------------------------------------------------------------------------')
-
-            dad_params[f"{layer}.weight"].grad.data = (act_tall.T.mm(local_grad_tall)).T.contiguous()
+                grad_final, act_final = power_iteration_BC(
+                    local_grad_tall.T.contiguous(),
+                    act_tall.T.contiguous(),
+                    rank=self.reduction_rank,
+                    numiterations=self.num_pow_iters,
+                    device=self._local_grads[layer].device
+                )
+                for other_rank in range(1, _dist.get_world_size()):
+                    _dist.send(tensor=grad_final, dst=other_rank)
+                    _dist.send(tensor=act_final, dst=other_rank)
+            else:
+                grad_final = _torch.zeros(delta_local_reduced.shape).to(delta_local_reduced.device)
+                act_final = _torch.zeros(act_local_reduced.shape).to(delta_local_reduced.device)
+                _dist.recv(grad_final, src=0)
+                _dist.recv(act_final, src=0)            
+            #test = (act_final.mm(grad_final.T)).T.contiguous()
+            #print("OK", test.shape, dad_params[f"{layer}.weight"].grad.shape)
+            dad_params[f"{layer}.weight"].grad.data = (act_final.mm(grad_final.T)).T.contiguous()
             if dad_params.get(f"{layer}.bias") is not None:
                 dad_params[f"{layer}.bias"].grad.data = local_grad_tall.sum(0)
