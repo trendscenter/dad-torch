@@ -121,7 +121,7 @@ class NNTrainer:
         """
 
         if self.args.get('use_ddp'):
-            if self.args.get('dad_reduction'):
+            if self.args.get("dad_reduction") and self.args.get('dad_reduction') != "None":
                 for model_key in self.nn:
                     self.nn[model_key] = self.nn[model_key].to(self.device['gpu'])
                 for model_key in self.nn:
