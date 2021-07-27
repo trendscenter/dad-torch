@@ -1,3 +1,4 @@
+import torch
 import torch as _torch
 from torch import distributed as _dist
 from dad_torch.power_iteration_BC import power_iteration_BC
@@ -75,10 +76,18 @@ class DADParallel(_torch.nn.Module):
 
     """gather is not implemented in nccl backend"""
 
-    def _dad_reduce_gather_broadcast(self, act_tensor, grad_tensor, dest=0, *args, **kw):
+    def _dad_reduce_gather_broadcast(self, act_tensor, grad_tensor, dest=0, rank_sizes=None, *args, **kw):
         """This function plays the role of remote"""
-        act_gathered = [_torch.zeros_like(act_tensor) for _ in range(_dist.get_world_size())]
-        grad_gathered = [_torch.zeros_like(grad_tensor) for _ in range(_dist.get_world_size())]
+        if rank_sizes:
+            act_gathered = [
+                _torch.zeros((r, act_tensor.shape[1]), dtype=act_tensor.dtype, device=act_tensor.device) for
+                r in rank_sizes]
+            grad_gathered = [
+                _torch.zeros((r, grad_tensor.shape[1]), dtype=grad_tensor.dtype, device=grad_tensor.device)
+                for r in rank_sizes]
+        else:
+            act_gathered = [_torch.zeros_like(act_tensor) for _ in range(_dist.get_world_size())]
+            grad_gathered = [_torch.zeros_like(grad_tensor) for _ in range(_dist.get_world_size())]
 
         """Compression here"""
         _dist.gather(act_tensor, act_gathered if _dist.get_rank() == dest else None, dst=dest)
@@ -93,11 +102,19 @@ class DADParallel(_torch.nn.Module):
 
         return act_gathered, grad_gathered
 
-    def _dad_reduce_all_gather(self, act_tensor, grad_tensor, *args, **kw):
+    def _dad_reduce_all_gather(self, act_tensor, grad_tensor, rank_sizes=None, *args, **kw):
 
         """This function plays the role of remote"""
-        act_gathered = [_torch.zeros_like(act_tensor) for _ in range(_dist.get_world_size())]
-        grad_gathered = [_torch.zeros_like(grad_tensor) for _ in range(_dist.get_world_size())]
+        if rank_sizes:
+            act_gathered = [
+                _torch.zeros((r, act_tensor.shape[1]), dtype=act_tensor.dtype, device=act_tensor.device) for
+                r in rank_sizes]
+            grad_gathered = [
+                _torch.zeros((r, grad_tensor.shape[1]), dtype=grad_tensor.dtype, device=grad_tensor.device)
+                for r in rank_sizes]
+        else:
+            act_gathered = [_torch.zeros_like(act_tensor) for _ in range(_dist.get_world_size())]
+            grad_gathered = [_torch.zeros_like(grad_tensor) for _ in range(_dist.get_world_size())]
 
         _dist.all_gather(act_gathered, act_tensor)
         _dist.all_gather(grad_gathered, grad_tensor)
@@ -166,18 +183,26 @@ class DADParallel(_torch.nn.Module):
                 device=self._local_grads[layer].device
             )
 
+            """Effective ranks of the world."""
+            effective_world_ranks = [torch.Tensor([self.reduction_rank]).to(self.device) for _ in
+                                     range(_dist.get_world_size())]
+            _dist.all_gather(effective_world_ranks, torch.Tensor([delta_local_reduced.shape[1]]).to(self.device))
+            effective_world_ranks = [int(r.item()) for r in effective_world_ranks]
+
             if self.commn_mode == 'all_gather':
                 act_tall, local_grad_tall = self._dad_reduce_all_gather(
                     act_local_reduced.T,
                     delta_local_reduced.T,
-                    dest=reduce_in_rank
+                    dest=reduce_in_rank,
+                    rank_sizes=effective_world_ranks
                 )
 
             elif self.commn_mode == 'gather_broadcast':
                 act_tall, local_grad_tall = self._dad_reduce_gather_broadcast(
                     act_local_reduced.T,
                     delta_local_reduced.T,
-                    dest=reduce_in_rank
+                    dest=reduce_in_rank,
+                    rank_sizes=effective_world_ranks
                 )
 
             dad_params[f"{layer}.weight"].grad.data = (act_tall.T.mm(local_grad_tall)).T.contiguous()

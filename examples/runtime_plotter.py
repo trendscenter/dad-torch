@@ -43,10 +43,10 @@ for k in keys:
     _DATA = []
     lim = float('inf')
     for p in args['paths']:
-        _d = np.cumsum(get_log(p)[k][skip:])
-        if len(_d) < lim:
+        _d = get_log(p).get(k, [])
+        if lim > len(_d) > 0:
             lim = len(_d)
-        _DATA.append(_d)
+        _DATA.append(np.cumsum(_d)[min(skip, len(_d)):])
 
     for _d in _DATA:
         sns.lineplot(x=range(lim), y=_d[:lim], ax=axs[0])
