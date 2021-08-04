@@ -13,7 +13,7 @@ import torch.multiprocessing as _mp
 import dad_torch.config as _conf
 import dad_torch.utils as _utils
 from dad_torch.config.state import *
-from dad_torch.data import ETDataset, ETDataHandle
+from dad_torch.data import DTDataset, DTDataHandle
 from dad_torch.trainer import NNTrainer
 from dad_torch.utils.logger import *
 
@@ -265,22 +265,22 @@ class DADTorch:
         best_exists = _os.path.exists(trainer.cache['log_dir'] + _sep + trainer.cache['best_checkpoint'])
         if best_exists and (self.args['phase'] == Phase.TRAIN or self.args['pretrained_path'] is None):
             """ Best model will be split_name.pt in training phase, and if no pretrained path is supplied. """
-            trainer.load_checkpoint(trainer.cache['log_dir'] + _sep + trainer.cache['best_checkpoint'])
+            trainer.load_checkpoint(trainer.cache['log_dir'] + _sep + trainer.cache['best_checkpoint'],
+                                    map_location=trainer.device['gpu'], load_optimizer_state=False)
 
         """ Run and save experiment test scores """
-        if test_dataset is not None:
-            test_out = trainer.evaluation(mode='test', save_pred=True, distributed=False, dataset=test_dataset)
-            test_scores = trainer.reduce_scores([test_out], distributed=False)
-            trainer.cache[LogKey.TEST_METRICS] = [[split_file,
-                                                   *test_scores['averages'].get(),
-                                                   *test_scores['metrics'].get()]]
-            _utils.save_scores(trainer.cache, experiment_id=trainer.cache['experiment_id'],
-                               file_keys=[LogKey.TEST_METRICS])
-            return test_out
+        test_out = trainer.inference(mode='test', save_predictions=True, datasets=test_dataset)
+        test_scores = trainer.reduce_scores([test_out], distributed=False)
+        trainer.cache[LogKey.TEST_METRICS] = [[split_file,
+                                               *test_scores['averages'].get(),
+                                               *test_scores['metrics'].get()]]
+        _utils.save_scores(trainer.cache, experiment_id=trainer.cache['experiment_id'],
+                           file_keys=[LogKey.TEST_METRICS])
+        return test_out
 
     def run(self, trainer_cls: typing.Type[NNTrainer],
-            dataset_cls: typing.Type[ETDataset] = None,
-            data_handle_cls: typing.Type[ETDataHandle] = ETDataHandle):
+            dataset_cls: typing.Type[DTDataset] = None,
+            data_handle_cls: typing.Type[DTDataHandle] = DTDataHandle):
         if self.args.get('use_ddp'):
             _mp.spawn(_dad_worker, nprocs=self.args['num_gpus'],
                       args=(self, trainer_cls, dataset_cls, data_handle_cls))
@@ -324,10 +324,9 @@ class DADTorch:
                     self._train(trainer, train_dataset, validation_dataset, dspec)
 
                 if self.args['is_master']:
-                    test_dataset = trainer.data_handle.get_test_dataset(
-                        split_file, dspec, dataset_cls=dataset_cls
-                    )
-                    test_accum.append(self._test(split_file, trainer, test_dataset))
+                    test_dataset = trainer.data_handle.get_test_dataset(split_file, dspec, dataset_cls=dataset_cls)
+                    if test_dataset is not None:
+                        test_accum.append(self._test(split_file, trainer, test_dataset))
 
                 if trainer.args.get('use_ddp'):
                     _dist.barrier()
