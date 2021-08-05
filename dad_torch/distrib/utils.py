@@ -78,7 +78,7 @@ class DADParallel(_torch.nn.Module):
 
     """gather is not implemented in nccl backend"""
 
-    def _dad_reduce_gather_broadcast(self, act_tensor, grad_tensor, dest=0, rank_sizes=None, *args, **kw):
+    def _dad_reduce_gather_broadcast(self, act_tensor, grad_tensor, dest=0, *args, **kw):
         """This function plays the role of remote"""
         act_gathered = [_torch.zeros_like(act_tensor) for _ in range(_dist.get_world_size())]
         grad_gathered = [_torch.zeros_like(grad_tensor) for _ in range(_dist.get_world_size())]
