@@ -1,7 +1,7 @@
 import torch
 
 
-def power_iteration_BC(B, C, rank=10, numiterations=20, device='cuda', tol=0.0):
+def power_iteration_BC(B, C, rank=10, numiterations=20, device='cuda', tol=1e-3):
     CC = torch.mm(C.T, C)
     BCC = torch.mm(B, CC)
 

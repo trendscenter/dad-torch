@@ -1,5 +1,8 @@
+import torch
 import torch as _torch
+import torch.nn.functional as _F
 from torch import distributed as _dist
+
 from dad_torch.power_iteration_BC import power_iteration_BC
 
 _GATHER_BROADCAST_BACKENDS = ['mpi', 'gloo']
@@ -94,7 +97,6 @@ class DADParallel(_torch.nn.Module):
         return act_gathered, grad_gathered
 
     def _dad_reduce_all_gather(self, act_tensor, grad_tensor, *args, **kw):
-
         """This function plays the role of remote"""
         act_gathered = [_torch.zeros_like(act_tensor) for _ in range(_dist.get_world_size())]
         grad_gathered = [_torch.zeros_like(grad_tensor) for _ in range(_dist.get_world_size())]
@@ -165,6 +167,16 @@ class DADParallel(_torch.nn.Module):
                 numiterations=self.num_pow_iters,
                 device=self._local_grads[layer].device
             )
+
+            """ Pick Max rank of the world and pad to match """
+            max_rank = torch.Tensor([delta_local_reduced.shape[1]]).to(self.device)
+            _dist.all_reduce(max_rank, _dist.ReduceOp.MAX)
+
+            if max_rank > delta_local_reduced.shape[1]:
+                _pad = (0, int(max_rank.item() - delta_local_reduced.shape[1]))
+                act_local_reduced = _F.pad(act_local_reduced, _pad)
+                delta_local_reduced = _F.pad(delta_local_reduced, _pad)
+            """ Padding End """
 
             if self.commn_mode == 'all_gather':
                 act_tall, local_grad_tall = self._dad_reduce_all_gather(
