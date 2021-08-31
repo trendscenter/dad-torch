@@ -1,7 +1,6 @@
 r"""
 The main core of DADTorch
 """
-import datetime
 import math as _math
 import os as _os
 
@@ -67,7 +66,7 @@ class NNTrainer:
         if self.args['pretrained_path'] is not None:
             self.load_checkpoint(self.args['pretrained_path'],
                                  self.args.get('load_model_state', True),
-                                 self.args.get('load_optimizer_state', True))
+                                 self.args.get('load_optimizer_state', False))
 
         elif self.args['phase'] == 'train':
             _torch.manual_seed(self.args['seed'])
@@ -242,37 +241,26 @@ class NNTrainer:
     def evaluation(self,
                    epoch=1,
                    mode='eval',
-                   dataset: list = None,
-                   save_pred=False,
-                   distributed: bool = False,
-                   use_unpadded_sampler: bool = False) -> dict:
-
+                   dataloaders: list = None,
+                   save_pred=False) -> dict:
         for k in self.nn:
             self.nn[k].eval()
 
         eval_avg, eval_metrics = self.new_averages(), self.new_metrics()
 
-        if dataset is None:
+        if not dataloaders:
             return {'averages': eval_avg, 'metrics': eval_metrics}
 
         info(f'{mode} ...', self.args['verbose'])
-        if not isinstance(dataset, list):
-            dataset = [dataset]
 
-        loaders = []
-        for d in dataset:
-            loaders.append(
-                self.data_handle.get_loader(
-                    handle_key=mode,
-                    shuffle=False, dataset=d,
-                    distributed=distributed,
-                    use_unpadded_sampler=use_unpadded_sampler,
-                    reuse=len(dataset) == 1
-                )
-            )
+        def _update_scores(_out, _it, _avg, _metrics):
+            if _out is None:
+                _out = {}
+            _avg.accumulate(_out.get('averages', _it['averages']))
+            _metrics.accumulate(_out.get('metrics', _it['metrics']))
 
         with _torch.no_grad():
-            for loader in loaders:
+            for loader in dataloaders:
                 its = []
                 metrics = self.new_metrics()
                 avg = self.new_averages()
@@ -280,29 +268,29 @@ class NNTrainer:
                 for i, batch in enumerate(loader, 1):
                     it = self.iteration(batch)
 
-                    avg.accumulate(it.get('averages'))
-                    metrics.accumulate(it.get('metrics'))
-
                     if save_pred:
                         if self.args['load_sparse']:
                             its.append(it)
                         else:
-                            self.save_predictions(dataset, it)
+                            _update_scores(self.save_predictions(loader.dataset, it), it, avg, metrics)
+                    else:
+                        _update_scores(None, it, avg, metrics)
 
-                    if self.args['verbose'] and len(dataset) <= 1 and lazy_debug(i, add=epoch):
+                    if self.args['verbose'] and len(dataloaders) <= 1 and lazy_debug(i, add=epoch):
                         info(
                             f" Itr:{i}/{len(loader)}, "
                             f"Averages:{it.get('averages').get()}, Metrics:{it.get('metrics').get()}"
                         )
 
-                eval_metrics.accumulate(metrics)
-                eval_avg.accumulate(avg)
+                if save_pred and self.args['load_sparse']:
+                    its = self._reduce_iteration(its)
+                    _update_scores(self.save_predictions(loader.dataset, its), its, avg, metrics)
 
-                if self.args['verbose'] and len(dataset) > 1:
+                if self.args['verbose'] and len(dataloaders) > 1:
                     info(f" {mode}, {avg.get()}, {metrics.get()}")
 
-                if save_pred and self.args['load_sparse']:
-                    self.save_predictions(loader.dataset, self._reduce_iteration(its))
+                eval_metrics.accumulate(metrics)
+                eval_avg.accumulate(avg)
 
         info(f"{self.cache['experiment_id']} {mode} Averages:{eval_avg.get()}, Metrics:{eval_metrics.get()}",
              self.args['verbose'])
@@ -453,11 +441,23 @@ class NNTrainer:
                 f"Not best: {val_check['score']}, {self.cache['best_val_score']} in ep: {self.cache['best_val_epoch']}",
                 self.args['verbose'])
 
-    def validation(self, epoch, dataset) -> dict:
-        return self.evaluation(epoch=epoch, mode='validation',
-                               dataset=dataset,
-                               distributed=self.args['use_ddp'],
-                               use_unpadded_sampler=True)
+    def inference(self, mode='test', save_predictions=True, datasets: list = None, distributed=False):
+        if not isinstance(datasets, list):
+            datasets = [datasets]
+
+        loaders = []
+        for d in [_d for _d in datasets if _d]:
+            loaders.append(
+                self.data_handle.get_loader(
+                    handle_key=mode, shuffle=False, dataset=d, distributed=distributed
+                )
+            )
+
+        return self.evaluation(
+            mode=mode,
+            dataloaders=[_l for _l in loaders if _l],
+            save_pred=save_predictions
+        )
 
     def _global_debug(self, running_averages, running_metrics, **kw):
         """Update running accumulators."""
@@ -484,6 +484,17 @@ class NNTrainer:
             dataset=train_dataset,
             distributed=self.args['use_ddp']
         )
+
+        val_loader = self.data_handle.get_loader(
+            handle_key='validation',
+            shuffle=False,
+            dataset=validation_dataset,
+            distributed=self.args['use_ddp'],
+            use_unpadded_sampler=True
+        )
+
+        if val_loader is not None and not isinstance(val_loader, list):
+            val_loader = [val_loader]
 
         for ep in range(1, self.args['epochs'] + 1):
             for k in self.nn:
@@ -523,12 +534,11 @@ class NNTrainer:
                 [{'averages': epoch_avg, 'metrics': epoch_metrics}],
                 distributed=self.args['use_ddp']
             )
-
             epoch_out = {'epoch': ep, 'training': reduced_epoch}
 
             """Validation step"""
-            if validation_dataset is not None:
-                val_out = self.validation(ep, validation_dataset)
+            if val_loader is not None:
+                val_out = self.evaluation(ep, mode='validation', dataloaders=val_loader, save_pred=False)
                 epoch_out['validation'] = self.reduce_scores([val_out], distributed=self.args['use_ddp'])
 
             self._on_epoch_end(**epoch_out)
