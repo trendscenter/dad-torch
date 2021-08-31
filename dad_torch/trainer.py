@@ -65,7 +65,6 @@ class NNTrainer:
         If path to pretrained weights are given, it will be used instead.
         """
         if self.args['pretrained_path'] is not None:
-            print("LOADING???")
             self.load_checkpoint(self.args['pretrained_path'],
                                  self.args.get('load_model_state', True),
                                  self.args.get('load_optimizer_state', True))

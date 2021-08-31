@@ -49,6 +49,7 @@ for k in keys:
         _DATA.append(_d)
 
     for _d in _DATA:
+        lim = min(lim, len(_d[:lim]))
         sns.lineplot(x=range(lim), y=_d[:lim], ax=axs[0])
         sns.lineplot(x=range(lim), y=_d[:lim], ax=axs[1])
 
