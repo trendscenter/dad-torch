@@ -3,12 +3,7 @@ import torch.nn.functional as F
 from torch import nn
 from torchvision import datasets, transforms
 
-from dad_torch import DADTorch, NNTrainer, ConfusionMatrix, default_ap
-from dad_torch.config import boolean_string
-import argparse
-
-ap = argparse.ArgumentParser(parents=[default_ap], add_help=False)
-ap.add_argument('--ignore-backward', default=False, type=boolean_string, help='Ignore .backward in runtime record.')
+from dad_torch import DADTorch, NNTrainer, ConfusionMatrix
 
 transform = transforms.Compose([
     transforms.ToTensor(),
@@ -79,5 +74,5 @@ dataloader_args = {'train': {'dataset': train_dataset},
                    'test': {'dataset': val_dataset}}
 
 if __name__ == "__main__":
-    runner = DADTorch(dataloader_args=dataloader_args, args=ap, seed=3, seed_all=True, force=True)
+    runner = DADTorch(dataloader_args=dataloader_args, seed=3, seed_all=True, force=True)
     runner.run(MNISTTrainer)

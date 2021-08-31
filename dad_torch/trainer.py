@@ -376,22 +376,16 @@ class NNTrainer:
         _start = time.time()
         it = self.iteration(batch)
         tot = tot + duration(self.cache, _start, key=None)
-
-        _start = time.time()
-        it['loss'].backward()
-        bk_del = duration(self.cache, _start, key=None)
-        tot = tot + bk_del
-
         if self.args.get('dad_reduction'):
+            _start = time.time()
             assert self.args.get('grad_accum_iters', 1) == 1, \
                 "Gradient accumulation not yet implemented for DAD algorithm."
-
-            if self.args.get('ignore_backward'):
-                tot = tot - bk_del
-
-            _start = time.time()
             for mk in self.nn:
-                self.nn[mk].dad_backward(reduce_in_rank=MASTER_RANK)
+                self.nn[mk].dad_backward(it['loss'], reduce_in_rank=MASTER_RANK)
+            tot = tot + duration(self.cache, _start, key=None)
+        else:
+            _start = time.time()
+            it['loss'].backward()
             tot = tot + duration(self.cache, _start, key=None)
 
         if i % self.args.get('grad_accum_iters', 1) == 0:

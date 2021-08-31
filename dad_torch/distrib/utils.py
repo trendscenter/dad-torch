@@ -24,40 +24,29 @@ class DADParallel(_torch.nn.Module):
         self._reset()
 
     def _reset(self):
-        self.fw_hooks_handle = []
-        self.bk_hooks_handle = []
-        self._activations = {}
-        self._local_grads = {}
+        self._fw_hooks_handle = []
+        self._fw_out_ctx = {}
+        self._fw_in_ctx = {}
 
-    def _hook_fn(self, hook_type, layer):
-        def get(m, in_grad, out_grad):
-            if hook_type.lower() == 'forward':
-                for i, b in enumerate(in_grad):
-                    if b is not None:
-                        self._activations[layer] = b
+    def _hook_fn(self, layer, **kw):
+        def fw_hook(m, in_act, out_act):
+            for i, b in enumerate(in_act):
+                if b is not None:
+                    self._fw_in_ctx[layer] = b
                     break
-            if hook_type.lower() == 'backward':
-                for i, c in enumerate(out_grad):
-                    if c is not None:
-                        self._local_grads[layer] = c
-                    break
+            self._fw_out_ctx[layer] = out_act
 
-        return get
+        return fw_hook
 
     def _hook(self):
         if self.training:
             for layer, ch in list(self.module.named_children()):
-                self.fw_hooks_handle.append(
-                    ch.register_forward_hook(self._hook_fn('forward', layer))
-                )
-                self.bk_hooks_handle.append(
-                    ch.register_backward_hook(self._hook_fn('backward', layer))
+                self._fw_hooks_handle.append(
+                    ch.register_forward_hook(self._hook_fn(layer))
                 )
 
     def _unhook(self):
-        for hk in self.fw_hooks_handle:
-            hk.remove()
-        for hk in self.bk_hooks_handle:
+        for hk in self._fw_hooks_handle:
             hk.remove()
 
     def train(self, mode=True):
@@ -109,60 +98,61 @@ class DADParallel(_torch.nn.Module):
 
         return act_gathered, grad_gathered
 
-    def dad_backward(self, reduce_in_rank=0):
+    def dad_backward(self, loss, reduce_in_rank=0):
         if self.reduction_method == 'base':
-            self._base_backward()
+            self._base_backward(loss)
         elif self.reduction_method == 'dad':
-            self._dad_backward(reduce_in_rank)
+            self._dad_backward(loss, reduce_in_rank)
         elif self.reduction_method == 'rankdad':
-            self._rankdad_backward(reduce_in_rank)
+            self._rankdad_backward(loss, reduce_in_rank)
         else:
             raise NotImplementedError(
                 f'Not implemented for {self.reduction_method}. Please use one of None, base, dad, OR rankdad.')
 
-    def _base_backward(self, *args, **kwargs):
+    def _base_backward(self, loss, **kwargs):
         size = _dist.get_world_size()
+        loss.backward()
         for param in self.module.parameters():
             grad_gathered = [_torch.zeros_like(param.grad.data) for _ in range(size)]
             _dist.all_gather(grad_gathered, param.grad.data)
             param.grad.data = _torch.stack(grad_gathered).sum(0) / float(size)
 
-    def _dad_backward(self, reduce_in_rank=0):
+    def _dad_backward(self, loss, reduce_in_rank=0):
         dad_params = dict([(k, v) for k, v in self.module.named_parameters()])
         dad_children = dict([(k, v) for k, v in self.module.named_children()])
-
         for layer in list(dad_children.keys())[::-1]:
-            act_tall, local_grad_tall = [_torch.ones(1)] * 2
+            local_act = self._fw_in_ctx[layer]
+            local_grad = _torch.autograd.grad(loss, self._fw_out_ctx[layer], retain_graph=True)[0]
 
             if self.commn_mode == 'all_gather':
                 act_tall, local_grad_tall = self._dad_reduce_all_gather(
-                    self._activations[layer],
-                    self._local_grads[layer],
+                    local_act,
+                    local_grad,
                     dest=reduce_in_rank
                 )
             elif self.commn_mode == 'gather_broadcast':
-
                 act_tall, local_grad_tall = self._dad_reduce_gather_broadcast(
-                    self._activations[layer],
-                    self._local_grads[layer],
+                    local_act,
+                    local_grad,
                     dest=reduce_in_rank
                 )
 
             """Update weights"""
-            dad_params[f"{layer}.weight"].grad.data = (act_tall.T.mm(local_grad_tall)).T.contiguous()
+            dad_params[f"{layer}.weight"].grad = (act_tall.T.mm(local_grad_tall)).T.contiguous()
             if dad_params.get(f"{layer}.bias") is not None:
-                dad_params[f"{layer}.bias"].grad.data = local_grad_tall.sum(0)
+                dad_params[f"{layer}.bias"].grad = local_grad_tall.sum(0)
 
-    def _rankdad_backward(self, reduce_in_rank=0):
+    def _rankdad_backward(self, loss, reduce_in_rank=0):
         dad_params = dict([(k, v) for k, v in self.module.named_parameters()])
         dad_children = dict([(k, v) for k, v in self.module.named_children()])
 
         for layer in list(dad_children.keys())[::-1]:
-            act_tall, local_grad_tall = [_torch.ones(1)] * 2
+            local_act = self._fw_in_ctx[layer]
+            local_grad = _torch.autograd.grad(loss, self._fw_out_ctx[layer], retain_graph=True)[0]
 
             delta_local_reduced, act_local_reduced = power_iteration_BC(
-                self._local_grads[layer].T,
-                self._activations[layer].T,
+                local_grad.T,
+                local_act.T,
                 rank=self.reduction_rank,
                 numiterations=self.num_pow_iters,
                 device=self._local_grads[layer].device
@@ -192,6 +182,6 @@ class DADParallel(_torch.nn.Module):
                     dest=reduce_in_rank
                 )
 
-            dad_params[f"{layer}.weight"].grad.data = (act_tall.T.mm(local_grad_tall)).T.contiguous()
+            dad_params[f"{layer}.weight"].grad = (act_tall.T.mm(local_grad_tall)).T.contiguous()
             if dad_params.get(f"{layer}.bias") is not None:
-                dad_params[f"{layer}.bias"].grad.data = local_grad_tall.sum(0)
+                dad_params[f"{layer}.bias"].grad = local_grad_tall.sum(0)
