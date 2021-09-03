@@ -1,6 +1,6 @@
 mode="rankdad"
-nsites=8
-real_nsites=7
+nsites=4
+real_nsites=$((nsites - 1))
 for i in $(seq 0 $real_nsites); 
 do echo $i; 
 if [ $i -eq 0 ]

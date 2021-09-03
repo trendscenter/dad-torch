@@ -7,6 +7,7 @@
 #SBATCH --gpus 1
 #SBATCH -A PSYC0002
 #SBATCH --oversubscribe
+#SBATCH --exclude trendsagn001.rs.gsu.edu,trendsagn002.rs.gsu.edu,trendsagn003.rs.gsu.edu,trendsagn004.rs.gsu.edu,trendsagn005.rs.gsu.edu,trendsagn006.rs.gsu.edu,trendsagn007.rs.gsu.edu,trendsagn008.rs.gsu.edu,trendsagn009.rs.gsu.edu,trendsagn011.rs.gsu.edu,trendsagn010.rs.gsu.edu,trendsagn018.rs.gsu.edu
 
 eval "$(conda shell.bash hook)"
 conda activate pytorch19
@@ -14,5 +15,9 @@ cd /data/users2/bbaker/projects/dad-torch
 rank=$1
 mode=$2
 sites=$3
-PYTHONPATH=. python examples/MNIST_dadtorch.py -ddp True --node-rank $rank --dad-reduction $mode --num-nodes $sites --dist-url tcp://10.245.10.78:8998 --master-addr 10.245.10.78 --master-port 8998 -ph train --dist-backend gloo --batch_size 64 -log "net_logs/"$mode"_DADs"$sites"b64r5"
+base_batch=64
+actual_batch=$((base_batch * sites))
+actual_batch="1"
+echo ACTUAL BATCH IS $actual_batch
+PYTHONPATH=. python examples/WIKITEXT_transformer.py -ddp True --node-rank $rank --batch_size $actual_batch --dad-reduction $mode --num-nodes $sites --dist-url tcp://10.245.10.98:8998 --master-addr 10.245.10.98 --master-port 8998 -ph train --dist-backend gloo -log "net_logs/b512_WIKITEXT_"$mode"_DADs"$sites"b"$actual_batch"r5"
 

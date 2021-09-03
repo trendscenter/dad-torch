@@ -207,7 +207,7 @@ class NNTrainer:
         r"""It tells which metrics to monitor and either to maximize(F1 score), minimize(MSE)"""
         self.cache.update(monitor_metric='time', metric_direction='maximize')
 
-    def iteration(self, batch) -> dict:
+    def iteration(self, i, batch) -> dict:
         r"""
         Left for user to implement one mini-bath iteration:
         Example:{
@@ -279,7 +279,7 @@ class NNTrainer:
                 avg = self.new_averages()
 
                 for i, batch in enumerate(loader, 1):
-                    it = self.iteration(batch)
+                    it = self.iteration(i,batch)
 
                     avg.accumulate(it.get('averages'))
                     metrics.accumulate(it.get('metrics'))
@@ -386,7 +386,7 @@ class NNTrainer:
         tot = datetime.timedelta(0)
 
         _start = time.time()
-        it = self.iteration(batch)
+        it = self.iteration(i, batch)
         tot = tot + duration(self.cache, _start, key=None)
 
         _start = time.time()
@@ -403,7 +403,7 @@ class NNTrainer:
 
             _start = time.time()
             for mk in self.nn:
-                self.nn[mk].dad_backward(reduce_in_rank=MASTER_RANK)
+                self.nn[mk].dad_backward(reduce_in_rank=MASTER_RANK, itr=i, all_at_once=self.args.get("all_at_once"))
             tot = tot + duration(self.cache, _start, key=None)
 
         if i % self.args.get('grad_accum_iters', 1) == 0:
@@ -477,6 +477,72 @@ class NNTrainer:
             running_averages.reset(), running_metrics.reset()
 
     def train(self, train_dataset, validation_dataset) -> None:
+        info('Training ...', self.args['verbose'])
+
+        train_loader = self.data_handle.get_loader(
+            handle_key='train',
+            shuffle=True,
+            dataset=train_dataset,
+            distributed=self.args['use_ddp']
+        )
+
+        for ep in range(1, self.args['epochs'] + 1):
+            for k in self.nn:
+                self.nn[k].train()
+
+            """Collect accumulated iterations data"""
+            its = []
+
+            """Collect epoch metrics and averages"""
+            epoch_avg, epoch_metrics = self.new_averages(), self.new_metrics()
+
+            """Keep track of running metrics and averages for logging/plotting"""
+            _metrics, _avg = self.new_metrics(), self.new_averages()
+
+            if self.args.get('use_ddp'):
+                train_loader.sampler.set_epoch(ep)
+
+            num_iters = len(train_loader) // self.args['grad_accum_iters']
+            for i, batch in enumerate(train_loader, 1):
+                its.append(self.training_iteration(i, batch))
+                """When end of iteration"""
+                if i % self.args['grad_accum_iters'] == 0:
+                    it = self._reduce_iteration(its)
+
+                    """Update global accumulators"""
+                    its = []
+                    it['num_iters'] = num_iters
+                    it['i'] = i // self.args['grad_accum_iters']
+                    epoch_avg.accumulate(it.get('averages'))
+                    epoch_metrics.accumulate(it.get('metrics'))
+
+                    if self.args['is_master']:
+                        self._global_debug(_avg, _metrics, epoch=ep, **it)
+                    self._on_iteration_end(i=i, epoch=ep, it=it)
+
+            reduced_epoch = self.reduce_scores(
+                [{'averages': epoch_avg, 'metrics': epoch_metrics}],
+                distributed=self.args['use_ddp']
+            )
+
+            epoch_out = {'epoch': ep, 'training': reduced_epoch}
+
+            """Validation step"""
+            if validation_dataset is not None:
+                val_out = self.validation(ep, validation_dataset)
+                epoch_out['validation'] = self.reduce_scores([val_out], distributed=self.args['use_ddp'])
+
+            self._on_epoch_end(**epoch_out)
+            if self.args['is_master']:
+                self._global_epoch_end(**epoch_out)
+
+            if self._stop_early(**epoch_out):
+                break
+
+        """Plot at the end regardless."""
+        self._save_progress(epoch=ep)
+
+    def lm_train(self, train_dataset, validation_dataset) -> None:
         info('Training ...', self.args['verbose'])
 
         train_loader = self.data_handle.get_loader(

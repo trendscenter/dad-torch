@@ -35,7 +35,7 @@ def multiRun(nproc: int, data_list: list, func: Callable) -> list:
 
 def safe_collate(batch):
     r"""Safely select batches/skip dataset_cls(errors in file loading."""
-    return _default_collate([b for b in batch if b])
+    return _default_collate([b for b in batch if b == 0 or b])
 
 
 def num_workers(args, loader_args, distributed=False):
@@ -139,7 +139,7 @@ class ETDataHandle:
 
         loader_args = {
             'dataset': None,
-            'batch_size': 1,
+            'batch_size': 64,
             'sampler': None,
             'shuffle': False,
             'batch_sampler': None,
@@ -147,6 +147,7 @@ class ETDataHandle:
             'pin_memory': False,
             'drop_last': False,
             'timeout': 0,
+            'collate_fn': safe_collate,
             'worker_init_fn': _seed_worker if args.get('seed_all') else None
         }
         for k in loader_args.keys():
@@ -171,7 +172,7 @@ class ETDataHandle:
             loader_args['num_workers'] = num_workers(args, loader_args, True)
             loader_args['batch_size'] = batch_size(args, loader_args, True)
 
-        self.dataloader[handle_key] = _DataLoader(collate_fn=safe_collate, **loader_args)
+        self.dataloader[handle_key] = _DataLoader(**loader_args)
         return self.dataloader[handle_key]
 
     def create_splits(self, dataspec, out_dir):

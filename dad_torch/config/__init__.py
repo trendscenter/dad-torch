@@ -21,7 +21,7 @@ class StoreDictKeyPairSS(_ap.Action):
 
 default_ap = _ap.ArgumentParser()
 
-default_ap.add_argument('-ph', '--phase', default=None, choices=['train', 'test'], type=str,
+default_ap.add_argument('-ph', '--phase', default='train', choices=['train', 'test'], type=str,
                         help='Can be train/test.')
 default_ap.add_argument("-b", "--batch_size", default=4, type=int, help="Mini-batch size.")
 default_ap.add_argument('-ep', '--epochs', default=11, type=int, help='Number of epochs.')
@@ -49,14 +49,14 @@ default_ap.add_argument('-nf', '--num_folds', default=None, type=int, help='Numb
 default_ap.add_argument('-spl', '--split_ratio', default=None, nargs='*', type=float,
                         help='Split ratio. Eg: 0.6 0.2 0.2 or 0.8 0.2. Exclusive to num_fold.')
 
-default_ap.add_argument('-ddp', '--use_ddp', default=False, type=boolean_string, help='Use DDP?')
+default_ap.add_argument('-ddp', '--use_ddp', default=True, type=boolean_string, help='Use DDP?')
 
 _im, _ = default_ap.parse_known_args()
 _args = vars(_im)
 if _args.get('use_ddp'):
     default_ap.add_argument('--node-rank', default=0, type=int,
                             help='Node rank for distributed training')
-    default_ap.add_argument('--num-nodes', default=1, type=int,
+    default_ap.add_argument('--num-nodes', default=2, type=int,
                             help='Number of nodes for distributed training')
     default_ap.add_argument('--world-size', default=None, type=int,
                             help='World size(Total participating processes(CPU training only))')
@@ -78,6 +78,7 @@ if _args.get('use_ddp'):
                             help='Num of power iterations.')
     default_ap.add_argument('--dad-commn-mode', default='all_gather', type=str,
                             help='Collective communication mode.')
+    default_ap.add_argument("-aao", "--all-at-once", default=False, type=boolean_string, help="Communicate all at once? (RankdAD only)")
 
 _known, _unknown = default_ap.parse_known_args()
 default_args = vars(_known)
