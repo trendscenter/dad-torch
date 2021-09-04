@@ -165,9 +165,9 @@ class DADParallel(_torch.nn.Module):
                     )
 
                 """Update weights"""
-                dad_params[f"{module_name}.weight"].grad.data = (act_tall.T.mm(local_grad_tall)).T.contiguous()
-                if dad_params.get(f"{module_name}.bias") is not None:
-                    dad_params[f"{module_name}.bias"].grad.data = local_grad_tall.sum(0)
+                dad_params["weight"].grad.data = (act_tall.T.mm(local_grad_tall)).T.contiguous()
+                if dad_params.get("bias") is not None:
+                    dad_params["bias"].grad.data = local_grad_tall.sum(0)
 
         for ch_name, ch in list(self.module.named_children())[::-1]:
             _backward(ch_name, ch)
@@ -217,9 +217,9 @@ class DADParallel(_torch.nn.Module):
                         dest=reduce_in_rank
                     )
 
-                dad_params[f"{module_name}.weight"].grad.data = (act_tall.T.mm(local_grad_tall)).T.contiguous()
-                if dad_params.get(f"{module_name}.bias") is not None:
-                    dad_params[f"{module_name}.bias"].grad.data = local_grad_tall.sum(0)
+                dad_params["weight"].grad.data = (act_tall.T.mm(local_grad_tall)).T.contiguous()
+                if dad_params.get("bias") is not None:
+                    dad_params["bias"].grad.data = local_grad_tall.sum(0)
 
         for ch_name, ch in list(self.module.named_children())[::-1]:
             _backward(ch_name, ch)
