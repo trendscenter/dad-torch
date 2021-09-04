@@ -1,6 +1,7 @@
 import os as _os
 import copy as _copy
 import json as _json
+from .power_iteration_BC import power_iteration_BC
 
 
 class FrozenDict(dict):

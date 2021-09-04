@@ -3,7 +3,7 @@ import torch.nn.functional as _F
 from torch import distributed as _dist
 
 from .utils import DadHook as _DADHook
-from dad_torch.power_iteration_BC import power_iteration_BC
+from dad_torch.utils import power_iteration_BC as _power_iter_BC
 
 
 class DADParallel(_DADHook):
@@ -120,7 +120,7 @@ class DADParallel(_DADHook):
 
             elif len(dad_params) > 0:
                 """ Rank reduce with PowerIteration """
-                delta_local_reduced, act_local_reduced = power_iteration_BC(
+                delta_local_reduced, act_local_reduced = _power_iter_BC(
                     self._local_grads[module_name].T,
                     self._activations[module_name].T,
                     rank=self.reduction_rank,
