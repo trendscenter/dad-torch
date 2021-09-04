@@ -36,7 +36,7 @@ class MNISTNet(nn.Module):
 
 class MNISTTrainer(NNTrainer):
     def _init_nn_model(self):
-        self.nn['model'] = MNISTNet()
+        self.nn['model'] = nn.Sequential(MNISTNet())
 
     def iteration(self, batch):
         inputs = torch.flatten(batch[0].to(self.device['gpu']).float(), 1)
