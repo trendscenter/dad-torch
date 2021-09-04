@@ -1,4 +1,3 @@
-import torch
 import torch as _torch
 import torch.nn.functional as _F
 from torch import distributed as _dist
@@ -134,7 +133,7 @@ class DADParallel(_DADHook):
                 """Rank-reduction end. """
 
                 """ Pick Max rank of the world and pad to match """
-                max_rank = torch.Tensor([delta_local_reduced.shape[1]]).to(self.device)
+                max_rank = _torch.Tensor([delta_local_reduced.shape[1]]).to(self.device)
                 _dist.all_reduce(max_rank, _dist.ReduceOp.MAX)
 
                 if max_rank > delta_local_reduced.shape[1]:
