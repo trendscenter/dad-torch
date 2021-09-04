@@ -13,6 +13,8 @@ from vit_pytorch.efficient import ViT
 from dad_torch import NNTrainer, DADTorch
 from dad_torch.metrics import Prf1a
 
+"""Download data from https://www.kaggle.com/c/dogs-vs-cats/data"""
+
 os.makedirs('data', exist_ok=True)
 train_dir = 'data/train'
 test_dir = 'data/test'
@@ -138,8 +140,20 @@ dataloader_args = {
     'test': {'dataset': test_data}
 }
 
+# vit = ViT(
+#             dim=128,
+#             image_size=224,
+#             patch_size=32,
+#             num_classes=2,
+#             transformer=efficient_transformer,
+#             channels=3,
+#         )
+#
+# for k, p in list(vit.named_parameters()):
+#     print(k, p.shape)
+
 if __name__ == "__main__":
     runner = DADTorch(phase='train',
                       dataloader_args=dataloader_args,
-                      seed=3, seed_all=True, force=True, batch_size=16)
+                      seed=3, seed_all=True, force=True, batch_size=32)
     runner.run(Cifar10Trainer)
