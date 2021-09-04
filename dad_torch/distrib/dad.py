@@ -5,9 +5,6 @@ from torch import distributed as _dist
 from .utils import DadHook as _DADHook
 from dad_torch.power_iteration_BC import power_iteration_BC
 
-_GATHER_BROADCAST_BACKENDS = ['mpi', 'gloo']
-_ALL_GATHER_BACKENDS = ['nccl']
-
 
 class DADParallel(_DADHook):
     def __init__(self, module, device=None, reduction_method='dad', reduction_rank=5, num_pow_iters=1, **kw):
