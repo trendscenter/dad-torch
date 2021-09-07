@@ -1,7 +1,6 @@
 import torch
 import time
 
-<<<<<<< HEAD:dad_torch/power_iteration_BC.py
 def power_iteration_BC(B, C, rank=10, numiterations=20, device='cuda', tol=0.0, do_benchmarks=True):
     B = B.float()
     C = C.float()
@@ -19,11 +18,6 @@ def power_iteration_BC(B, C, rank=10, numiterations=20, device='cuda', tol=0.0, 
         raise Exception(str(B.shape) + " b - c " + str(C.shape))
     benchmarks["CC"] = str(time.time() - start)
     start = time.time()
-=======
-
-def power_iteration_BC(B, C, rank=10, numiterations=20, device='cuda', tol=1e-3):
-    CC = torch.mm(C.T, C)
->>>>>>> master:dad_torch/utils/power_iteration_BC.py
     BCC = torch.mm(B, CC)
     benchmarks["BCC"] = str(time.time() - start)
     def zero_result():
