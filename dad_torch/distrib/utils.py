@@ -1,4 +1,5 @@
 import torch as _torch
+<<<<<<< HEAD
 from torch import distributed as _dist
 from dad_torch.power_iteration_BC import power_iteration_BC
 import ujson as json
@@ -11,13 +12,15 @@ class DADParallel(_torch.nn.Module):
         assert _dist.is_initialized(), "*** Default process group is not initialized. ***"
 
         super(DADParallel, self).__init__()
+=======
+
+
+class DadHook(_torch.nn.Module):
+    def __init__(self, module, device=None, **kw):
+        super(DadHook, self).__init__()
+>>>>>>> master
         self.module = module
         self.device = device
-        self.cache = kw.get('cache', {})
-        self.reduction_method = reduction_method
-        self.reduction_rank = reduction_rank
-        self.num_pow_iters = num_pow_iters
-        self.commn_mode = kw.get('commn_mode', 'all_gather')
         self._reset()
 
     def _reset(self):
@@ -26,30 +29,41 @@ class DADParallel(_torch.nn.Module):
         self._activations = {}
         self._local_grads = {}
 
-    def _hook_fn(self, hook_type, layer):
+    def _hook_fn(self, hook_type, hook_key):
         def get(m, in_grad, out_grad):
             if hook_type.lower() == 'forward':
                 for i, b in enumerate(in_grad):
                     if b is not None:
-                        self._activations[layer] = b
+                        self._activations[hook_key] = b
                     break
             if hook_type.lower() == 'backward':
                 for i, c in enumerate(out_grad):
                     if c is not None:
-                        self._local_grads[layer] = c
+                        self._local_grads[hook_key] = c
                     break
 
         return get
 
     def _hook(self):
-        if self.training:
-            for layer, ch in list(self.module.named_children()):
+        def _hook_recursive(module_name, module):
+            children = list(module.named_children())
+            if len(children) > 0:
+                for children_name, child in children:
+                    _hook_recursive(
+                        self._hierarchy_key(module_name, children_name),
+                        child
+                    )
+            elif len(list(module.parameters())) > 0:
                 self.fw_hooks_handle.append(
-                    ch.register_forward_hook(self._hook_fn('forward', layer))
+                    module.register_forward_hook(self._hook_fn('forward', module_name))
                 )
                 self.bk_hooks_handle.append(
-                    ch.register_backward_hook(self._hook_fn('backward', layer))
+                    module.register_backward_hook(self._hook_fn('backward', module_name))
                 )
+
+        if self.training:
+            for ch_name, ch in list(self.module.named_children()):
+                _hook_recursive(ch_name, ch)
 
     def _unhook(self):
         for hk in self.fw_hooks_handle:
@@ -73,6 +87,7 @@ class DADParallel(_torch.nn.Module):
         output = self.module(*inputs, **kwargs)
         return output
 
+<<<<<<< HEAD
     """gather is not implemented in nccl backend"""
 
     def _dad_reduce_gather_broadcast(self, act_tensor, grad_tensor, dest=0, *args, **kw):
@@ -269,3 +284,7 @@ class DADParallel(_torch.nn.Module):
                 except KeyError as e:
                     print("Keyerror in layer" + str(e))
                     continue
+=======
+    def _hierarchy_key(self, *args):
+        return ".".join([f"{a}" for a in args])
+>>>>>>> master

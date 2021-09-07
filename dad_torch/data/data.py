@@ -67,21 +67,15 @@ def _et_data_job(mode, arg, dspec, cls, total, func, verbose, i, file):
     return func(mode, file, dspec, arg, cls)
 
 
-class ETDataHandle:
+class DTDataHandle:
 
     def __init__(self, args=None, dataloader_args=None, **kw):
-        self.dataset = {}
-        self.dataloader = {}
         self.args = _etutils.FrozenDict(args)
         self.dataloader_args = _etutils.FrozenDict(dataloader_args)
 
-    def get_dataset(self, handle_key, files, dataspec: dict, reuse=False, dataset_cls=None):
-        if reuse and self.dataset.get(handle_key):
-            return self.dataset[handle_key]
-
+    def get_dataset(self, handle_key, files, dataspec: dict, dataset_cls=None):
         dataset = dataset_cls(mode=handle_key, limit=self.args['load_limit'], **self.args)
         dataset.add(files=files, verbose=self.args['verbose'], **dataspec)
-        self.dataset[handle_key] = dataset
         return dataset
 
     def get_train_dataset(self, split_file, dataspec: dict, dataset_cls=None):
@@ -114,7 +108,7 @@ class ETDataHandle:
         with open(dataspec['split_dir'] + _sep + split_file) as file:
             _files = _json.loads(file.read()).get('test', [])[:self.args['load_limit']]
             if self.args['load_sparse'] and len(_files) > 1:
-                datasets = ETDataHandle.multi_load('test', _files, dataspec, self.args, dataset_cls)
+                datasets = DTDataHandle.multi_load('test', _files, dataspec, self.args, dataset_cls)
                 success(f'\n{len(datasets)} sparse dataset loaded.', self.args['verbose'])
             else:
                 datasets = self.get_dataset('test', _files, dataspec, dataset_cls=dataset_cls)
@@ -122,20 +116,15 @@ class ETDataHandle:
             if len(datasets) > 0 and sum([len(t) for t in datasets if t]) > 0:
                 return datasets
 
-    def get_loader(self,
-                   handle_key='', distributed=False,
-                   use_unpadded_sampler=False,
-                   reuse=False, **kw
-                   ):
-
-        if reuse and self.dataloader.get(handle_key) is not None:
-            return self.dataloader[handle_key]
-
+    def get_loader(self, handle_key='', distributed=False, use_unpadded_sampler=False, **kw):
         args = {**self.args}
         args['distributed'] = distributed
         args['use_unpadded_sampler'] = use_unpadded_sampler
         args.update(self.dataloader_args.get(handle_key, {}))
         args.update(**kw)
+
+        if args.get('dataset') is None:
+            return None
 
         loader_args = {
             'dataset': None,
@@ -150,6 +139,7 @@ class ETDataHandle:
             'collate_fn': safe_collate,
             'worker_init_fn': _seed_worker if args.get('seed_all') else None
         }
+
         for k in loader_args.keys():
             loader_args[k] = args.get(k, loader_args.get(k))
 
@@ -172,8 +162,7 @@ class ETDataHandle:
             loader_args['num_workers'] = num_workers(args, loader_args, True)
             loader_args['batch_size'] = batch_size(args, loader_args, True)
 
-        self.dataloader[handle_key] = _DataLoader(**loader_args)
-        return self.dataloader[handle_key]
+        return _DataLoader(**loader_args)
 
     def create_splits(self, dataspec, out_dir):
         if _du.should_create_splits_(out_dir, dataspec, self.args):
@@ -204,15 +193,15 @@ class ETDataHandle:
 
         nw = min(num_workers(args, args, args['use_ddp']), len(_files))
         with _mp.Pool(processes=max(1, nw)) as pool:
-            data_list = list(
+            dataset_list = list(
                 pool.starmap(
                     _partial(_et_data_job, mode, args, dataspec, dataset_cls, len(_files), func, args['verbose']),
                     _files)
             )
-            return [_d for _d in data_list if len(_d) >= 1]
+            return [_d for _d in dataset_list if len(_d) >= 1]
 
 
-class ETDataset(_Dataset):
+class DTDataset(_Dataset):
     def __init__(self, mode='init', limit=None, **kw):
         self.mode = mode
         self.limit = limit
@@ -236,7 +225,7 @@ class ETDataset(_Dataset):
         """
         _files = files[:self.limit]
         if len(_files) > 1:
-            dataset_objs = ETDataHandle.multi_load(
+            dataset_objs = DTDataHandle.multi_load(
                 self.mode, _files, self.dataspecs[dataspec_name], self.args, self.__class__
             )
             self.gather(dataset_objs)
