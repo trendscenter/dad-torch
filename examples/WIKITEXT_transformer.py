@@ -148,8 +148,8 @@ test_data = batchify(test_data, eval_batch_size)
 train_range = range(0, train_data.size(0) - 1, bptt)
 test_range = range(0, test_data.size(0) - 1, bptt)
 
-dataloader_args = {'train': {'dataset': train_range, "batch_size": 1, "shuffle": False},
-                   'test': {'dataset': test_range,  "batch_size": 1, "shuffle":False}}
+dataloader_args = {'train': {'dataset': train_range, "batch_size": 1, "shuffle": False, "drop_last": True},
+                   'test': {'dataset': test_range,  "batch_size": 1, "shuffle":False, "drop_last": True}}
 
 if __name__ == "__main__":
     runner = DADTorch(dataloader_args=dataloader_args, args=ap, seed=3, seed_all=True, force=True)

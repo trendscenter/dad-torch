@@ -99,8 +99,14 @@ class DADParallel(_torch.nn.Module):
         act_gathered = [_torch.zeros_like(act_tensor) for _ in range(_dist.get_world_size())]
         grad_gathered = [_torch.zeros_like(grad_tensor) for _ in range(_dist.get_world_size())]
 
-        _dist.all_gather(act_gathered, act_tensor)
-        _dist.all_gather(grad_gathered, grad_tensor)
+        try:
+            _dist.all_gather(act_gathered, act_tensor)
+        except Exception:
+            raise(Exception("After _dist.all_gather (act) we have " + str(act_tensor.shape)))
+        try:
+            _dist.all_gather(grad_gathered, grad_tensor)
+        except Exception:
+            raise(Exception("After _dist.all_gather (grad) we have " + str(grad_tensor.shape)))
 
         act_gathered = _torch.cat(act_gathered)
         grad_gathered = _torch.cat(grad_gathered)
@@ -157,7 +163,6 @@ class DADParallel(_torch.nn.Module):
 
         for layer in list(dad_children.keys())[::-1]:
             act_tall, local_grad_tall = [_torch.ones(1)] * 2
-
             if self.commn_mode == 'all_gather':
                 act_tall, local_grad_tall = self._dad_reduce_all_gather(
                     self._activations[layer],
@@ -186,6 +191,8 @@ class DADParallel(_torch.nn.Module):
         dad_children = dict([(k, v) for k, v in self.module.named_children()])
         queued_communication = {}
         for layer in list(dad_children.keys())[::-1]:
+            if str(layer) in ["pos_embedding", "token_embedding"]:
+                continue
             act_tall, local_grad_tall = [_torch.ones(1)] * 2
             
             delta_local_reduced, act_local_reduced, benchmarks = power_iteration_BC(
@@ -221,17 +228,20 @@ class DADParallel(_torch.nn.Module):
                         dest=reduce_in_rank
                     )
                 try:
-                    print("We haven't done something: " + str(dad_params[f"{layer}.weight"].grad.data.shape))                    
+                    print("Local gradient Shape Before Reassignment: " + str(dad_params[f"{layer}.weight"].grad.data.shape))                    
                     computed = (act_tall.T.mm(local_grad_tall)).T.contiguous()
                     if dad_params[f"{layer}.weight"].grad.data.shape == computed.shape:                        
                         dad_params[f"{layer}.weight"].grad.data = (act_tall.T.mm(local_grad_tall)).T.contiguous()
-                        print("We've done something: " + str(dad_params[f"{layer}.weight"].grad.data.shape))
+                        print("Distributed gradient shape After Reassignment: " + str(dad_params[f"{layer}.weight"].grad.data.shape))
                         if dad_params.get(f"{layer}.bias") is not None:
                             dad_params[f"{layer}.bias"].grad.data = local_grad_tall.sum(0)
-                except KeyError:
+                except KeyError as e:
+                    print("Keyerror in layer " + str(e))
                     continue
         if all_at_once:
             for layer in list(dad_children.keys())[::-1]:
+                if str(layer) in ["pos_embedding", "token_embedding"]:
+                    continue
                 delta_local_reduced = queued_communication[layer]["delta"]
                 act_local_reduced = queued_communication[layer]["activation"]
                 if self.commn_mode == 'all_gather':
@@ -248,12 +258,14 @@ class DADParallel(_torch.nn.Module):
                         dest=reduce_in_rank
                     )
                 try:
-                    print("We haven't done something: " + str(dad_params[f"{layer}.weight"].grad.data.shape))                    
+                    print("Local gradient Shape Before Reassignment: In layer :" + layer + str(dad_params[f"{layer}.weight"].grad.data.shape))                    
                     computed = (act_tall.T.mm(local_grad_tall)).T.contiguous()
                     if dad_params[f"{layer}.weight"].grad.data.shape == computed.shape:                        
                         dad_params[f"{layer}.weight"].grad.data = (act_tall.T.mm(local_grad_tall)).T.contiguous()
-                        print("We've done something: " + str(dad_params[f"{layer}.weight"].grad.data.shape))
+                        print("Distributed gradient shape After Reassignment: " + str(dad_params[f"{layer}.weight"].grad.data.shape))
                         if dad_params.get(f"{layer}.bias") is not None:
                             dad_params[f"{layer}.bias"].grad.data = local_grad_tall.sum(0)
-                except KeyError:
+
+                except KeyError as e:
+                    print("Keyerror in layer" + str(e))
                     continue
