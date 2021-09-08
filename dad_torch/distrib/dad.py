@@ -99,10 +99,11 @@ class DADParallel(_DADHook):
                     _backward(self._hierarchy_key(module_name, child_name), child)
 
             elif self._is_dad_module.get(module_name):
+                act, delta = self._mm_flatten(self._activations[module_name], self._local_grads[module_name])
                 """ Update and sync weights """
                 self._synced_param_update_(
-                    self._activations[module_name],
-                    self._local_grads[module_name],
+                    act,
+                    delta,
                     dad_params,
                     reduce_in_rank,
                     module_name,
@@ -110,6 +111,12 @@ class DADParallel(_DADHook):
 
         for ch_name, ch in list(self.module.named_children())[::-1]:
             _backward(ch_name, ch)
+
+    def _mm_flatten(self, *tensors):
+        if len(tensors[0].shape) > 2:
+            dims = list(range(len(tensors[0].shape)))
+            return [t.flatten(*dims[:-1]) for t in tensors]
+        return tensors
 
     def _rankdad_backward(self, reduce_in_rank=0):
 
@@ -122,10 +129,12 @@ class DADParallel(_DADHook):
                     _backward(self._hierarchy_key(module_name, child_name), child)
 
             elif self._is_dad_module.get(module_name):
+                act, delta = self._mm_flatten(self._activations[module_name], self._local_grads[module_name])
+
                 """ Rank reduce with PowerIteration """
                 delta_local_reduced, act_local_reduced = _power_iter_BC(
-                    self._local_grads[module_name].T,
-                    self._activations[module_name].T,
+                    delta.T,
+                    act.T,
                     rank=self.reduction_rank,
                     numiterations=self.num_pow_iters,
                     device=self._local_grads[module_name].device
