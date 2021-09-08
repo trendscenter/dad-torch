@@ -84,13 +84,9 @@ class DADParallel(_DADHook):
                 dest=dst_rank
             )
 
-        try:
-            print(_dist.get_rank(), act_tall.shape, local_grad_tall.shape, parameters["weight"].shape, args)
-            parameters["weight"].grad.data = (act_tall.T.mm(local_grad_tall)).T.contiguous()
-            if parameters.get("bias") is not None:
-                parameters["bias"].grad.data = local_grad_tall.sum(0)
-        except:
-            pass
+        parameters["weight"].grad.data = (act_tall.T.mm(local_grad_tall)).T.contiguous()
+        if parameters.get("bias") is not None:
+            parameters["bias"].grad.data = local_grad_tall.sum(0)
 
     def _dad_backward(self, reduce_in_rank=0):
 
@@ -102,7 +98,7 @@ class DADParallel(_DADHook):
                 for child_name, child in dad_children.items():
                     _backward(self._hierarchy_key(module_name, child_name), child)
 
-            elif len(dad_params) > 0:
+            elif self._is_dad_module.get(module_name):
                 """ Update and sync weights """
                 self._synced_param_update_(
                     self._activations[module_name],
@@ -125,7 +121,7 @@ class DADParallel(_DADHook):
                 for child_name, child in dad_children.items():
                     _backward(self._hierarchy_key(module_name, child_name), child)
 
-            elif len(dad_params) > 0:
+            elif self._is_dad_module.get(module_name):
                 """ Rank reduce with PowerIteration """
                 delta_local_reduced, act_local_reduced = _power_iter_BC(
                     self._local_grads[module_name].T,
