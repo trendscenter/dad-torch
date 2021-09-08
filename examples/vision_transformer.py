@@ -27,8 +27,7 @@ test_dir = 'data/test'
 train_list = glob.glob(os.path.join(train_dir, '*.jpg'))
 test_list = glob.glob(os.path.join(test_dir, '*.jpg'))
 
-print(f"Train Data: {len(train_list)}")
-print(f"Test Data: {len(test_list)}")
+
 
 labels = [path.split('/')[-1].split('.')[0] for path in train_list]
 
@@ -36,10 +35,6 @@ train_list, valid_list = train_test_split(train_list,
                                           test_size=0.2,
                                           stratify=labels,
                                           random_state=3)
-
-print(f"Train Data: {len(train_list)}")
-print(f"Validation Data: {len(valid_list)}")
-print(f"Test Data: {len(test_list)}")
 
 train_transforms = transforms.Compose(
     [
@@ -131,8 +126,9 @@ class Cifar10Trainer(NNTrainer):
         return Prf1a()
 
 
-train_data = CatsDogsDataset(train_list, transform=train_transforms)
-valid_data = CatsDogsDataset(valid_list, transform=test_transforms)
+lim = 2000
+train_data = CatsDogsDataset(train_list[:lim], transform=train_transforms)
+valid_data = CatsDogsDataset(valid_list[:int(0.5 * lim)], transform=test_transforms)
 test_data = CatsDogsDataset(test_list, transform=test_transforms)
 dataloader_args = {
     'train': {'dataset': train_data},
@@ -140,19 +136,11 @@ dataloader_args = {
     'test': {'dataset': test_data}
 }
 
-# vit = ViT(
-#             dim=128,
-#             image_size=224,
-#             patch_size=32,
-#             num_classes=2,
-#             transformer=efficient_transformer,
-#             channels=3,
-#         )
-#
-# for k, p in list(vit.named_parameters()):
-#     print(k, p.shape)
-
 if __name__ == "__main__":
+    print(f"Train Data: {len(train_data)}")
+    print(f"Validation Data: {len(valid_data)}")
+    print(f"Test Data: {len(test_data)}")
+
     runner = DADTorch(phase='train',
                       dataloader_args=dataloader_args,
                       seed=3, seed_all=True, force=True, batch_size=32)
