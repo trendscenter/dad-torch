@@ -2,8 +2,8 @@ import torch as _torch
 import torch.nn.functional as _F
 from torch import distributed as _dist
 
-from .utils import DadHook as _DADHook
 from dad_torch.utils import power_iteration_BC as _power_iter_BC
+from .utils import DadHook as _DADHook
 
 
 class DADParallel(_DADHook):
@@ -18,6 +18,7 @@ class DADParallel(_DADHook):
         self.commn_mode = kw.get('commn_mode', 'all_gather')
 
     """gather is not implemented in nccl backend"""
+
     def _dad_reduce_gather_broadcast(self, act_tensor, grad_tensor, dest=0, *args, **kw):
         """This function plays the role of remote"""
         act_gathered = [_torch.zeros_like(act_tensor) for _ in range(_dist.get_world_size())]
@@ -67,7 +68,7 @@ class DADParallel(_DADHook):
             _dist.all_gather(grad_gathered, param.grad.data)
             param.grad.data = _torch.stack(grad_gathered).sum(0) / float(size)
 
-    def _synced_param_update_(self, activations, local_grads, parameters, dst_rank):
+    def _synced_param_update_(self, activations, local_grads, parameters, dst_rank, *args):
         act_tall, local_grad_tall = [_torch.ones(1)] * 2
         if self.commn_mode == 'all_gather':
             act_tall, local_grad_tall = self._dad_reduce_all_gather(
@@ -82,6 +83,7 @@ class DADParallel(_DADHook):
                 local_grads,
                 dest=dst_rank
             )
+
         parameters["weight"].grad.data = (act_tall.T.mm(local_grad_tall)).T.contiguous()
         if parameters.get("bias") is not None:
             parameters["bias"].grad.data = local_grad_tall.sum(0)
@@ -96,17 +98,25 @@ class DADParallel(_DADHook):
                 for child_name, child in dad_children.items():
                     _backward(self._hierarchy_key(module_name, child_name), child)
 
-            elif len(dad_params) > 0:
+            elif self._is_dad_module.get(module_name):
+                act, delta = self._mm_flatten(self._activations[module_name], self._local_grads[module_name])
                 """ Update and sync weights """
                 self._synced_param_update_(
-                    self._activations[module_name],
-                    self._local_grads[module_name],
+                    act,
+                    delta,
                     dad_params,
-                    reduce_in_rank
+                    reduce_in_rank,
+                    module_name,
                 )
 
         for ch_name, ch in list(self.module.named_children())[::-1]:
             _backward(ch_name, ch)
+
+    def _mm_flatten(self, *tensors):
+        if len(tensors[0].shape) > 2:
+            dims = list(range(len(tensors[0].shape)))
+            return [t.flatten(*dims[:-1]) for t in tensors]
+        return tensors
 
     def _rankdad_backward(self, reduce_in_rank=0):
 
@@ -118,11 +128,13 @@ class DADParallel(_DADHook):
                 for child_name, child in dad_children.items():
                     _backward(self._hierarchy_key(module_name, child_name), child)
 
-            elif len(dad_params) > 0:
+            elif self._is_dad_module.get(module_name):
+                act, delta = self._mm_flatten(self._activations[module_name], self._local_grads[module_name])
+
                 """ Rank reduce with PowerIteration """
                 delta_local_reduced, act_local_reduced = _power_iter_BC(
-                    self._local_grads[module_name].T,
-                    self._activations[module_name].T,
+                    delta.T,
+                    act.T,
                     rank=self.reduction_rank,
                     numiterations=self.num_pow_iters,
                     device=self._local_grads[module_name].device

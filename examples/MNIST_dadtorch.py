@@ -21,9 +21,9 @@ class MNISTNet(nn.Module):
     def __init__(self):
         super(MNISTNet, self).__init__()
         self.l1 = nn.Linear(784, 2048, bias=True)
-        self.mid = nn.Sequential(nn.Linear(2048, 1024, bias=True), nn.ReLU(),
-                                 nn.Linear(1024, 512, bias=True), nn.ReLU(),
-                                 nn.Linear(512, 256, bias=True), nn.ReLU()
+        self.mid = nn.Sequential(nn.Linear(2048, 1024, bias=True), nn.BatchNorm1d(1024), nn.ReLU(),
+                                 nn.Linear(1024, 512, bias=True), nn.BatchNorm1d(512), nn.ReLU(),
+                                 nn.Linear(512, 256, bias=True), nn.BatchNorm1d(256), nn.ReLU()
                                  )
         self.l5 = nn.Linear(256, 10, bias=True)
 
@@ -67,7 +67,7 @@ train_dataset = datasets.MNIST('data', train=True, download=True,
                                transform=transform)
 val_dataset = datasets.MNIST('data', train=False,
                              transform=transform)
-iter = 64 * 1000
+iter = 64 * 200
 train_dataset.data = train_dataset.data[:iter].clone()
 train_dataset.target = train_dataset.targets[:iter].clone()
 
