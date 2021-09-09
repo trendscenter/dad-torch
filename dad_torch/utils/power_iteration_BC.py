@@ -2,8 +2,13 @@ import torch
 
 
 def power_iteration_BC(B, C, rank=10, numiterations=20, device='cuda', tol=1e-3):
-    CC = torch.mm(C.T, C)
-    BCC = torch.mm(B, CC)
+    [cm, cn] = C.shape
+    if cm > cn:
+        CC = torch.mm(C.T, C)
+        BCC = torch.mm(B, CC)
+    else:
+        BCT = torch.mm(B, C.T)
+        BCC = torch.mm(BCT, BCT.T)
 
     def zero_result():
         sigma = torch.tensor(0.0, device=device)
@@ -14,6 +19,10 @@ def power_iteration_BC(B, C, rank=10, numiterations=20, device='cuda', tol=1e-3)
     def eigenvalue(B, v):
         Bv = torch.mv(B.T, v)
         return torch.sqrt(Bv.dot(torch.mv(CC, Bv)))
+
+    def eigenvalue2(B, v):
+        Bv = torch.mv(torch.mm(C, B.T), v)
+        return torch.sqrt(Bv.T.dot(Bv))
 
     def past_values(computed_eigs):
         bb = torch.stack([x['b'] for x in computed_eigs], 0)
@@ -32,15 +41,24 @@ def power_iteration_BC(B, C, rank=10, numiterations=20, device='cuda', tol=1e-3)
             if computed_eigs:
                 adjuster = torch.mv(vv.T, torch.mv(bb, b_k))
             # calculate the matrix-by-vector product (BC'CB' - adjusting_matrix)b
-            b_k1 = torch.mv(BCC, torch.mv(B.T, b_k)) - adjuster
+            if cm > cn:
+                b_k1 = torch.mv(BCC, torch.mv(B.T, b_k)) - adjuster
+            else:
+                b_k1 = torch.mv(BCC, b_k) - adjuster
             # calculate the norm of b
             b_k1_norm = torch.norm(b_k1)
             # re normalize the vector
             b_k = b_k1 / b_k1_norm
 
-        sigma = eigenvalue(B, b_k)
+        if cm > cn:
+            sigma = eigenvalue(B, b_k)
+        else:
+            sigma = eigenvalue2(B, b_k)
         if torch.isnan(sigma): return zero_result()
-        c_k = torch.mv(C, torch.mv(B.T, b_k))/sigma
+        if cm > cn:
+            c_k = torch.mv(C, torch.mv(B.T, b_k))/sigma
+        else:
+            c_k = torch.mv(BCT.T, b_k)/sigma
         if len(computed_eigs)>1 and torch.norm(b_k - computed_eigs[-1]['b'])/torch.norm(computed_eigs[-1]['b'])  < tol:
             r = zero_result()
             computed_eigs[-1]['b'] = r['b']
