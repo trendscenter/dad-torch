@@ -71,7 +71,7 @@ def power_iteration_BC(B, C, rank=10, numiterations=20, device='cuda', tol=1e-3)
         eigs += [iterations(computed_eigs=eigs[1:], is_sigma=eigs[-1]["sigma"])]
         if eigs[-1]["sigma"] == 0.0:
             break
-    eigs = eigs[1:-2]
+    eigs = eigs[1:-1]
     return (
         torch.stack([x["sigma"] * x["b"] for x in eigs], 1),
         torch.stack([x["c"] for x in eigs], 1),)
