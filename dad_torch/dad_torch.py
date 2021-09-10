@@ -257,7 +257,7 @@ class DADTorch:
 
     def _train(self, trainer, train_dataset, validation_dataset, dspec):
         trainer.train(train_dataset, validation_dataset)
-        trainer.save_checkpoint(trainer.cache['log_dir'] + _sep + trainer.cache['latest_checkpoint'])
+        #trainer.save_checkpoint(trainer.cache['log_dir'] + _sep + trainer.cache['latest_checkpoint'])
         _utils.save_cache({**self.args, **trainer.cache, **dspec},
                           experiment_id=trainer.cache['experiment_id'])
 
@@ -266,7 +266,7 @@ class DADTorch:
         if best_exists and (self.args['phase'] == Phase.TRAIN or self.args['pretrained_path'] is None):
             """ Best model will be split_name.pt in training phase, and if no pretrained path is supplied. """
             trainer.load_checkpoint(trainer.cache['log_dir'] + _sep + trainer.cache['best_checkpoint'],
-                                    map_location=trainer.device['gpu'], load_optimizer_state=False)
+                                    load_optimizer_state=False)
 
         """ Run and save experiment test scores """
         test_out = trainer.inference(mode='test', save_predictions=True, datasets=test_dataset)

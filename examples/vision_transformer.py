@@ -16,8 +16,8 @@ from dad_torch.metrics import Prf1a
 """Download data from https://www.kaggle.com/c/dogs-vs-cats/data"""
 
 os.makedirs('data', exist_ok=True)
-train_dir = 'data/train'
-test_dir = 'data/test'
+train_dir = 'data/dogsVscats/train'
+test_dir = 'data/dogsVscats/test'
 # with zipfile.ZipFile('data/train.zip') as train_zip:
 #     train_zip.extractall('data')
 #

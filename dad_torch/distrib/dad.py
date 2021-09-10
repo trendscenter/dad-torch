@@ -5,6 +5,8 @@ from torch import distributed as _dist
 from dad_torch.utils import power_iteration_BC as _power_iter_BC
 from .utils import DadHook as _DADHook
 
+import time
+
 
 class DADParallel(_DADHook):
     def __init__(self, module, device=None, reduction_method='dad', reduction_rank=5, num_pow_iters=1, **kw):
@@ -123,7 +125,7 @@ class DADParallel(_DADHook):
         def _backward(module_name, module):
             dad_params = dict(list(module.named_parameters())[::-1])
             dad_children = dict(list(module.named_children())[::-1])
-
+            print("*"*10)
             if len(dad_children) > 0:
                 for child_name, child in dad_children.items():
                     _backward(self._hierarchy_key(module_name, child_name), child)
@@ -132,6 +134,11 @@ class DADParallel(_DADHook):
                 act, delta = self._mm_flatten(self._activations[module_name], self._local_grads[module_name])
 
                 """ Rank reduce with PowerIteration """
+                #print("-"*5)
+                #print("In module " + module_name)
+                #print("B shape: " + str(delta.T.shape))
+                #print("C shape: " + str(act.T.shape))
+                #start = time.time()
                 delta_local_reduced, act_local_reduced = _power_iter_BC(
                     delta.T,
                     act.T,
@@ -139,6 +146,10 @@ class DADParallel(_DADHook):
                     numiterations=self.num_pow_iters,
                     device=self._local_grads[module_name].device
                 )
+                #end = time.time()
+                #print("B reduced shape: " + str(delta_local_reduced.shape))
+                #print("C reduced shape: " + str(act_local_reduced.shape))
+                #print("Took %f seconds" % (end - start))
                 """Rank-reduction end. """
 
                 """ Pick Max rank of the world and pad to match """
