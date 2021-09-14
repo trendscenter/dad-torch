@@ -1,14 +1,20 @@
 import torch
+import time
+from .logger import duration
 
 
-def power_iteration_BC(B, C, rank=10, numiterations=20, device='cuda', tol=1e-3):
+def power_iteration_BC(cache, B, C, rank=10, numiterations=20, device='cuda', tol=1e-3):
     [cm, cn] = C.shape
+    _start = time.time()
     if cm > cn:
         CC = torch.mm(C.T, C)
         BCC = torch.mm(B, CC)
     else:
         BCT = torch.mm(B, C.T)
         BCC = torch.mm(BCT, BCT.T)
+
+    duration(cache, _start, 'BCC_multiplication')
+
 
     def zero_result():
         sigma = torch.tensor(0.0, device=device)
