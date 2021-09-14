@@ -1,20 +1,19 @@
-import torch
 import time
+
+import torch
+
 from .logger import duration
 
 
-def power_iteration_BC(cache, B, C, rank=10, numiterations=20, device='cuda', tol=1e-3):
-    [cm, cn] = C.shape
+def power_iteration_BC(module_name, cache, B, C, rank=10, numiterations=20, device='cuda', tol=1e-3):
     _start = time.time()
+    [cm, cn] = C.shape
     if cm > cn:
         CC = torch.mm(C.T, C)
         BCC = torch.mm(B, CC)
     else:
         BCT = torch.mm(B, C.T)
         BCC = torch.mm(BCT, BCT.T)
-
-    duration(cache, _start, 'BCC_multiplication')
-
 
     def zero_result():
         sigma = torch.tensor(0.0, device=device)
@@ -39,7 +38,7 @@ def power_iteration_BC(cache, B, C, rank=10, numiterations=20, device='cuda', to
         if not is_sigma: return zero_result()
         # start with one of the columns
         b_k = torch.rand(B.shape[0], device=device)
-        #b_k = B[:, 0]  # np.random.randn(B.shape[0])
+        # b_k = B[:, 0]  # np.random.randn(B.shape[0])
         if computed_eigs:
             bb, vv = past_values(computed_eigs)
         for _ in range(numiterations):
@@ -62,22 +61,28 @@ def power_iteration_BC(cache, B, C, rank=10, numiterations=20, device='cuda', to
             sigma = eigenvalue2(B, b_k)
         if torch.isnan(sigma): return zero_result()
         if cm > cn:
-            c_k = torch.mv(C, torch.mv(B.T, b_k))/sigma
+            c_k = torch.mv(C, torch.mv(B.T, b_k)) / sigma
         else:
-            c_k = torch.mv(BCT.T, b_k)/sigma
-        if len(computed_eigs)>1 and torch.norm(b_k - computed_eigs[-1]['b'])/torch.norm(computed_eigs[-1]['b'])  < tol:
+            c_k = torch.mv(BCT.T, b_k) / sigma
+        if len(computed_eigs) > 1 and torch.norm(b_k - computed_eigs[-1]['b']) / torch.norm(
+                computed_eigs[-1]['b']) < tol:
             r = zero_result()
             computed_eigs[-1]['b'] = r['b']
             computed_eigs[-1]['c'] = r['c']
             computed_eigs[-1]['sigma'] = r['sigma']
             return zero_result()
         return {"b": b_k, "c": c_k, "sigma": sigma, "v": sigma * sigma * b_k}
+
     eigs = [{"sigma": torch.tensor(1.0, device=device)}]
     for i in range(rank):
         eigs += [iterations(computed_eigs=eigs[1:], is_sigma=eigs[-1]["sigma"])]
         if eigs[-1]["sigma"] == 0.0:
             break
     eigs = eigs[1:-1]
-    return (
+
+    result = (
         torch.stack([x["sigma"] * x["b"] for x in eigs], 1),
-        torch.stack([x["c"] for x in eigs], 1),)
+        torch.stack([x["c"] for x in eigs], 1))
+    duration(cache, _start, f'powerItr-{module_name}')
+
+    return result

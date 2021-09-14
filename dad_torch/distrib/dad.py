@@ -132,6 +132,7 @@ class DADParallel(_DADHook):
                 act, delta = self._mm_flatten(self._activations[module_name], self._local_grads[module_name])
                 """ Rank reduce with PowerIteration """
                 delta_local_reduced, act_local_reduced = _power_iter_BC(
+                    module_name,
                     self.cache,
                     delta.T,
                     act.T,
