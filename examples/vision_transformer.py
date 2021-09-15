@@ -143,5 +143,5 @@ if __name__ == "__main__":
 
     runner = DADTorch(phase='train',
                       dataloader_args=dataloader_args,
-                      seed=3, seed_all=True, force=True, batch_size=32)
+                      seed=3, seed_all=True, force=True)
     runner.run(Cifar10Trainer)
