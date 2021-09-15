@@ -1,3 +1,5 @@
+import argparse
+
 import torch
 import torch.nn.functional as F
 from torch import nn
@@ -5,7 +7,6 @@ from torchvision import datasets, transforms
 
 from dad_torch import DADTorch, NNTrainer, ConfusionMatrix, default_ap
 from dad_torch.config import boolean_string
-import argparse
 
 ap = argparse.ArgumentParser(parents=[default_ap], add_help=False)
 ap.add_argument('--ignore-backward', default=False, type=boolean_string, help='Ignore .backward in runtime record.')
@@ -21,15 +22,16 @@ class MNISTNet(nn.Module):
     def __init__(self):
         super(MNISTNet, self).__init__()
         self.l1 = nn.Linear(784, 2048, bias=True)
-        self.mid = nn.Sequential(nn.Linear(2048, 1024, bias=True), nn.BatchNorm1d(1024), nn.ReLU(),
-                                 nn.Linear(1024, 512, bias=True), nn.BatchNorm1d(512), nn.ReLU(),
-                                 nn.Linear(512, 256, bias=True), nn.BatchNorm1d(256), nn.ReLU()
-                                 )
+        self.l2 = nn.Linear(2048, 1024, bias=True)
+        self.l3 = nn.Linear(1024, 512, bias=True)
+        self.l4 = nn.Linear(512, 256, bias=True)
         self.l5 = nn.Linear(256, 10, bias=True)
 
     def forward(self, x):
         x = F.relu(self.l1(x))
-        x = self.mid(x)
+        x = F.relu(self.l2(x))
+        x = F.relu(self.l3(x))
+        x = F.relu(self.l4(x))
         output = F.log_softmax(self.l5(x), dim=1)
         return output
 
@@ -41,7 +43,6 @@ class MNISTTrainer(NNTrainer):
     def iteration(self, batch):
         inputs = torch.flatten(batch[0].to(self.device['gpu']).float(), 1)
         labels = batch[1].to(self.device['gpu']).long()
-        # print('***********: ', self.device['gpu'], torch.initial_seed())
 
         out = self.nn['model'](inputs)
         loss = F.nll_loss(out, labels)

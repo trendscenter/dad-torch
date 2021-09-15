@@ -10,4 +10,3 @@ seaborn==0.10.1
 -f https://download.pytorch.org/whl/torch_stable.html
 torch==1.9.0+cu111
 torchvision==0.10.0+cu111
-easytorch==2.9.2
