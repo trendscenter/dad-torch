@@ -28,9 +28,6 @@ def get_log(pth):
 
 
 keys = args['keys']
-if len(keys) == 0:
-    _keys = [k for k in get_log(args['paths'][0]).keys() if '_duration' in k]
-    keys = [k for k in _keys if not k.startswith('l')]  # SKIP Layer
 header = [p.split(os.sep)[-1].split('_')[-1] for p in args['paths']]
 
 skip = 5
