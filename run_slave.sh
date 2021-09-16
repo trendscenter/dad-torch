@@ -10,10 +10,15 @@
 #SBATCH --exclude trendsagn001.rs.gsu.edu,trendsagn002.rs.gsu.edu,trendsagn003.rs.gsu.edu,trendsagn004.rs.gsu.edu,trendsagn005.rs.gsu.edu,trendsagn006.rs.gsu.edu,trendsagn007.rs.gsu.edu,trendsagn008.rs.gsu.edu,trendsagn009.rs.gsu.edu,trendsagn011.rs.gsu.edu,trendsagn010.rs.gsu.edu,trendsagn016.rs.gsu.edu,trendsagn017.rs.gsu.edu,trendsagn018.rs.gsu.edu,trendsagn020.rs.gsu.edu
 
 eval "$(conda shell.bash hook)"
+
+cd /home/users/akhanal1/TrendsLab/dad-torch/
 conda activate pytorch_env
 
-cd /home/users/akhanal1/TrendsLab/dad-torch/examples
+sh ./deploy.sh
+
 rank=$1
 mode=$2
 sites=$3
-PYTHONPATH=../ python MNIST_dadtorch.py -ddp True --node-rank $rank --dad-reduction $mode --num-nodes $sites --dist-url tcp://10.245.12.98:8998 --master-addr 10.245.12.98 --master-port 8998 -ph train --dist-backend nccl --batch_size 64 -log "examples/net_logs/"$mode"-DADs"$sites
+
+cd examples
+python MNIST_dadtorch.py -ddp True --node-rank $rank --dad-reduction $mode --num-nodes $sites --dist-url tcp://10.245.12.98:8998 --master-addr 10.245.12.98 --master-port 8998 -ph train --dist-backend nccl --batch_size 64 -log "net_logs/"$mode"-DADs"$sites

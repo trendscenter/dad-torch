@@ -515,7 +515,6 @@ class NNTrainer:
 
             num_iters = len(train_loader) // self.args['grad_accum_iters']
             for i, batch in enumerate(train_loader, 1):
-                print(f'ITR-{i}')
                 its.append(self.training_iteration(i, batch))
                 """When end of iteration"""
                 if i % self.args['grad_accum_iters'] == 0:
