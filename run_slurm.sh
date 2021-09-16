@@ -1,4 +1,4 @@
-mode="rankdad"
+mode="dad"
 nsites=4
 real_nsites=3
 for i in $(seq 0 $real_nsites);
