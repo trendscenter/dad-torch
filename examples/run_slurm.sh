@@ -1,4 +1,4 @@
-modes=("base", "dad", "rankdad")
+modes=("base" "dad" "rankdad")
 nsites=4
 real_nsites=3
 for mode in "${modes[@]}"
