@@ -13,13 +13,8 @@
 eval "$(conda shell.bash hook)"
 conda activate pytorch_env
 
-# python setup.py clean sdist
-# LATEST_RELEASE="dist/$(ls -t1 dist|  head -n 1)"
-# TARGET="$1"
-# pip install $LATEST_RELEASE
-
 cd /home/users/akhanal1/TrendsLab/dad-torch/examples
 rank=$1
 mode=$2
 sites=$3
-PYTHONPATH=../ python MNIST_dadtorch.py -ddp True --node-rank $rank --dad-reduction $mode --num-nodes $sites --dist-url tcp://10.245.12.98:8998 --master-addr 10.245.12.98 --master-port 8998 -ph train --dist-backend nccl --batch_size 64 -log "net_logs/"$mode"-DADs"$sites
+PYTHONPATH=../ python MNIST_dadtorch.py -ddp True --node-rank $rank --dad-reduction $mode --num-nodes $sites --dist-url tcp://10.245.12.98:8998 --master-addr 10.245.12.98 --master-port 8998 -ph train --dist-backend nccl --batch_size 64 -log "examples/net_logs/"$mode"-DADs"$sites
