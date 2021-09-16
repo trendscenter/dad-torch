@@ -79,5 +79,5 @@ dataloader_args = {'train': {'dataset': train_dataset},
                    'test': {'dataset': val_dataset}}
 
 if __name__ == "__main__":
-    runner = DADTorch(dataloader_args=dataloader_args, args=ap, seed=3, seed_all=True, force=True, batch_size=64)
+    runner = DADTorch(dataloader_args=dataloader_args, args=ap, seed=3, seed_all=True, force=True)
     runner.run(MNISTTrainer)
