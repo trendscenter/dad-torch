@@ -9,7 +9,6 @@
 #SBATCH --oversubscribe
 #SBATCH --exclude trendsagn001.rs.gsu.edu,trendsagn002.rs.gsu.edu,trendsagn003.rs.gsu.edu,trendsagn004.rs.gsu.edu,trendsagn005.rs.gsu.edu,trendsagn006.rs.gsu.edu,trendsagn007.rs.gsu.edu,trendsagn008.rs.gsu.edu,trendsagn009.rs.gsu.edu,trendsagn011.rs.gsu.edu,trendsagn010.rs.gsu.edu,trendsagn016.rs.gsu.edu,trendsagn017.rs.gsu.edu,trendsagn018.rs.gsu.edu,trendsagn020.rs.gsu.edu
 
-
 eval "$(conda shell.bash hook)"
 conda activate pytorch_env
 
