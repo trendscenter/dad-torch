@@ -19,6 +19,5 @@ sh ./deploy.sh
 rank=$1
 mode=$2
 sites=$3
-
 cd examples
 python MNIST_dadtorch.py -ddp True --node-rank $rank --dad-reduction $mode --num-nodes $sites --dist-url tcp://10.245.12.98:8998 --master-addr 10.245.12.98 --master-port 8998 -ph train --dist-backend nccl --batch_size 64 -log "net_logs/"$mode"-DADs"$sites
