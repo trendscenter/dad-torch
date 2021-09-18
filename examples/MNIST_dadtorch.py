@@ -67,7 +67,7 @@ train_dataset = datasets.MNIST('data', train=True, download=True,
                                transform=transform)
 val_dataset = datasets.MNIST('data', train=False,
                              transform=transform)
-iter = 64 * 200
+iter = 64 * 800
 train_dataset.data = train_dataset.data[:iter].clone()
 train_dataset.target = train_dataset.targets[:iter].clone()
 
