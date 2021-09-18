@@ -72,9 +72,9 @@ if _args.get('use_ddp'):
 
     default_ap.add_argument('--dad-reduction', default="rankdad", type=str,
                             help="Will use DAD by master rank for reduction.options: (None/base/dad/rankdad)")
-    default_ap.add_argument('--dad-reduction-rank', default=5, type=int,
+    default_ap.add_argument('--dad-reduction-rank', default=10, type=int,
                             help='Rank of reduced matrices.')
-    default_ap.add_argument('--dad-pow-iters', default=1, type=int,
+    default_ap.add_argument('--dad-pow-iters', default=5, type=int,
                             help='Num of power iterations.')
     default_ap.add_argument('--dad-commn-mode', default='all_gather', type=str,
                             help='Collective communication mode.')
