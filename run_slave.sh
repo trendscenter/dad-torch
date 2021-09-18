@@ -18,7 +18,7 @@ mode=$2
 sites=$3
 branch=$4
 
-pip uninstall dad-torch -y
+#pip uninstall dad-torch -y
 if [[ "$branch" == "local" ]];
   then
     echo "********** Local installation **********"

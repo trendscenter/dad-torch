@@ -18,14 +18,14 @@ mode=$2
 sites=$3
 branch=$4
 
-pip uninstall dad-torch -y
+#pip uninstall dad-torch -y
 if [[ "$branch" == "local" ]];
   then
     echo "********** Local installation **********"
-    sh ./deploy.sh
+#    sh ./deploy.sh
 else
   echo "********** Git branch installation: "$branch"  *********"
-  pip install git+https://github.com/trendscenter/dad-torch.git@$branch
+#  pip install git+https://github.com/trendscenter/dad-torch.git@$branch
 fi
 
 cd examples
