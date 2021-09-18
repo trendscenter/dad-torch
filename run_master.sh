@@ -30,4 +30,4 @@ else
 fi
 
 cd examples
-python MNIST_dadtorch.py -ddp True --node-rank 0 --num-nodes $sites --dad-reduction $mode --dist-url tcp://10.245.12.102:8998 --master-addr 10.245.12.102 --master-port 8998 -ph train --dist-backend $backend --batch_size 64 -log "net_logs/"$branch"/"$mode"-DADs"$sites
+python MNIST_dadtorch.py -ddp True --node-rank 0 --num-nodes $sites --dad-reduction $mode --dist-url tcp://10.245.12.102:8998 --master-addr 10.245.12.102 --master-port 8998 -ph train --dist-backend $backend --batch_size 64 -log net_logs/"$branch"/"$backend"/"$mode"-DADs"$sites"
