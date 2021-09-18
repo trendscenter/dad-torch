@@ -7,7 +7,7 @@
 #SBATCH --gpus 1
 #SBATCH -A PSYC0002
 #SBATCH --oversubscribe
-#SBATCH --exclude trendsagn001.rs.gsu.edu,trendsagn002.rs.gsu.edu,trendsagn011.rs.gsu.edu,trendsagn012.rs.gsu.edu,trendsagn013.rs.gsu.edu,trendsagn014.rs.gsu.edu,trendsagn015.rs.gsu.edu,trendsagn016.rs.gsu.edu,trendsagn017.rs.gsu.edu,trendsagn018.rs.gsu.edu,trendsagn020.rs.gsu.edu
+#SBATCH --exclude trendsagn001.rs.gsu.edu,trendsagn002.rs.gsu.edu,trendsagn003.rs.gsu.edu,trendsagn004.rs.gsu.edu,trendsagn005.rs.gsu.edu,trendsagn006.rs.gsu.edu,trendsagn011.rs.gsu.edu,trendsagn012.rs.gsu.edu,trendsagn013.rs.gsu.edu,trendsagn014.rs.gsu.edu,trendsagn015.rs.gsu.edu,trendsagn016.rs.gsu.edu,trendsagn017.rs.gsu.edu,trendsagn018.rs.gsu.edu,trendsagn020.rs.gsu.edu
 
 eval "$(conda shell.bash hook)"
 cd /home/users/akhanal1/TrendsLab/dad-torch/
