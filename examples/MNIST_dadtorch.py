@@ -1,11 +1,15 @@
 import argparse
+import json
+import os
 
 import torch
 import torch.nn.functional as F
+import torch.utils.data as tdata
+from sklearn.model_selection import KFold
 from torch import nn
 from torchvision import datasets, transforms
 
-from dad_torch import DADTorch, NNTrainer, ConfusionMatrix, default_ap
+from dad_torch import DADTorch, NNTrainer, ConfusionMatrix, default_ap, DTDataHandle
 from dad_torch.config import boolean_string
 
 ap = argparse.ArgumentParser(parents=[default_ap], add_help=False)
@@ -63,20 +67,50 @@ class MNISTTrainer(NNTrainer):
         return ConfusionMatrix(num_classes=10)
 
 
+class KfoldDataHandle(DTDataHandle):
+    """Use this when needed to run k-fold(train,test one each fold) on directly passed Dataset from dataloader_args"""
+
+    def create_splits(self, dataspec, out_dir):
+        if self.args.get('num_folds') is None:
+            super(KfoldDataHandle, self).create_splits(dataspec, out_dir)
+        elif os.listdir:
+            dataspec['split_dir'] = out_dir + os.sep + 'splits'
+            os.makedirs(dataspec['split_dir'], exist_ok=True)
+            kf = KFold(self.args['num_folds'])
+            for i, (train_ix, test_ix) in enumerate(kf.split(self.dataloader_args['train']['dataset'])):
+                with open(dataspec['split_dir'] + os.sep + f'experiment{i}.json', 'w') as sp:
+                    sp.write(json.dumps({'train': train_ix.tolist(), 'test': test_ix.tolist()}))
+
+    def get_test_dataset(self, split_file, dataspec: dict, dataset_cls=None):
+        if self.args.get('num_folds') is None:
+            return super(KfoldDataHandle, self).get_test_dataset(split_file, dataspec, dataset_cls)
+        else:
+            with open(dataspec['split_dir'] + os.sep + split_file) as file:
+                test_ix = json.loads(file.read()).get('test', [])
+                return tdata.Subset(self.dataloader_args['train']['dataset'], test_ix)
+
+    def get_train_dataset(self, split_file, dataspec: dict, dataset_cls=None):
+        if self.args.get('num_folds') is None:
+            return super(KfoldDataHandle, self).get_train_dataset(split_file, dataspec, dataset_cls)
+        else:
+            with open(dataspec['split_dir'] + os.sep + split_file) as file:
+                train_ix = json.loads(file.read()).get('train', [])
+                return tdata.Subset(self.dataloader_args['train']['dataset'], train_ix)
+
+
 train_dataset = datasets.MNIST('data', train=True, download=True,
                                transform=transform)
 val_dataset = datasets.MNIST('data', train=False,
                              transform=transform)
-iter = 64 * 800
+iter = 64 * 400
 train_dataset.data = train_dataset.data[:iter].clone()
 train_dataset.target = train_dataset.targets[:iter].clone()
 
 val_dataset.data = val_dataset.data[:iter].clone()
 val_dataset.target = val_dataset.targets[:iter].clone()
 
-dataloader_args = {'train': {'dataset': train_dataset},
-                   'test': {'dataset': val_dataset}}
+dataloader_args = {'train': {'dataset': train_dataset}}
 
 if __name__ == "__main__":
     runner = DADTorch(dataloader_args=dataloader_args, args=ap, seed=3, seed_all=True, force=True)
-    runner.run(MNISTTrainer)
+    runner.run(MNISTTrainer, data_handle_cls=KfoldDataHandle)
