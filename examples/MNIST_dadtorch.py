@@ -14,6 +14,7 @@ from dad_torch.config import boolean_string
 
 ap = argparse.ArgumentParser(parents=[default_ap], add_help=False)
 ap.add_argument('--ignore-backward', default=False, type=boolean_string, help='Ignore .backward in runtime record.')
+ap.add_argument('--fold-num', default=None, type=int, help='Fold Number')
 
 transform = transforms.Compose([
     transforms.ToTensor(),
@@ -74,11 +75,22 @@ class KfoldDataHandle(DTDataHandle):
         if self.args.get('num_folds') is None:
             super(KfoldDataHandle, self).create_splits(dataspec, out_dir)
         elif os.listdir:
-            dataspec['split_dir'] = out_dir + os.sep + 'splits'
+            _dir = 'splits'
+            if self.args.get('fold_num') is not None:
+                _dir = f"{_dir}{self.args['fold_num']}"
+
+            dataspec['split_dir'] = out_dir + os.sep + _dir
             os.makedirs(dataspec['split_dir'], exist_ok=True)
             kf = KFold(self.args['num_folds'])
-            for i, (train_ix, test_ix) in enumerate(kf.split(self.dataloader_args['train']['dataset'])):
-                with open(dataspec['split_dir'] + os.sep + f'experiment{i}.json', 'w') as sp:
+            splits = list(kf.split(self.dataloader_args['train']['dataset']))
+
+            if self.args.get('fold_num') is None:
+                for i, (train_ix, test_ix) in enumerate(splits):
+                    with open(dataspec['split_dir'] + os.sep + f'experiment{i}.json', 'w') as sp:
+                        sp.write(json.dumps({'train': train_ix.tolist(), 'test': test_ix.tolist()}))
+            else:
+                train_ix, test_ix = splits[max(0, self.args['fold_num'] - 1)]
+                with open(dataspec['split_dir'] + os.sep + f"experiment{self.args['fold_num']}.json", 'w') as sp:
                     sp.write(json.dumps({'train': train_ix.tolist(), 'test': test_ix.tolist()}))
 
     def get_test_dataset(self, split_file, dataspec: dict, dataset_cls=None):
@@ -102,7 +114,7 @@ train_dataset = datasets.MNIST('data', train=True, download=True,
                                transform=transform)
 val_dataset = datasets.MNIST('data', train=False,
                              transform=transform)
-iter = 64 * 400
+iter = 64 * 10
 train_dataset.data = train_dataset.data[:iter].clone()
 train_dataset.target = train_dataset.targets[:iter].clone()
 
