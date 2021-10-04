@@ -11,6 +11,7 @@ RUN pip install -r requirements.txt
 RUN pip install awscli
 RUN pip install kaggle
 WORKDIR /app/dad-torch
+ADD data/mnist.py /app/dad-torch/data/mnist.py
 RUN python /app/dad-torch/data/mnist.py 
 #RUN kaggle 
 ADD master_aws.sh /app/dad-torch/master_aws.sh

@@ -22,7 +22,7 @@ echo LOG_FOLDER is $log_folder
 
 
 #aws s3 cp hostname.txt s3://dad-io/hosts
-PYTHONPATH=. python examples/$project -ddp True --dad-reduction $dad_reduction -ph train --dist-backend $dist_backend --batch_size $batch_size -nf 10 --fold-num $fold -log $log_folder --dist-url tcp://${master}:8998 --master-addr ${master} --master-port 8998 --rank ${rank}
+PYTHONPATH=. python examples/$project -ddp True --dad-reduction $dad_reduction -ph train --dist-backend $dist_backend --batch_size $batch_size -nf 10 --fold-num $fold -log $log_folder --dist-url tcp://${master}:8998 --master-addr ${master} --master-port 8998 --node-rank ${rank}
 mkdir to_S3
 mv $log_folder to_S3/ -v
 aws s3 cp to_S3 s3://dad-io/ --recursive
