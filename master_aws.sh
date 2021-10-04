@@ -5,6 +5,7 @@ dist_backend=$3
 batch_size=$4
 fold=$5
 sites=$6
+rank=$7
 git checkout aws-debug-ak
 pip install -r requirements.txt
 pip install awscli
@@ -13,7 +14,7 @@ hostname_file=${log_folder}"_hostname.txt"
 hostname -I | cut -f 1 -d " " > $hostname_file
 master=`hostname -I | cut -f 1 -d " "`
 aws s3 cp hostname.txt s3://dad-io/hosts
-PYTHONPATH=. python examples/$project -ddp True --dad-reduction $dad_reduction -ph train --dist-backend $dist_backend --batch_size $batch_size -nf 10 --fold-num $fold -log $log_folder --dist-url tcp://${master}:8998 --master-addr ${master} --master-port 8998
+PYTHONPATH=. python examples/$project -ddp True --dad-reduction $dad_reduction -ph train --dist-backend $dist_backend --batch_size $batch_size -nf 10 --fold-num $fold -log $log_folder --dist-url tcp://${master}:8998 --master-addr ${master} --master-port 8998 --rank ${rank}
 mkdir to_S3
 mv $log_folder to_S3/ -v
 aws s3 cp to_S3 s3://dad-io/ --recursive
